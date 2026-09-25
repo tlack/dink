@@ -7,7 +7,7 @@ smart-home specific, so any future scenario generator can reuse them.
 import copy
 import random
 
-from .scenario import PROMPT_BYTES, Scenario
+from ..data.scenario import PROMPT_BYTES, Scenario
 
 FILLERS = ["uh", "um", "ok", "hey", "so", "like", "yeah", "please", "alright"]
 ASR_SWAPS = {  # plausible speech-recognition confusions

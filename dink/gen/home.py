@@ -2,33 +2,22 @@
 and the right answer. Answer-preserving surface changes (slot order, typos, fillers,
 speech noise, moving prompt pieces) live in augment.py (stage 2).
 
-Every word list and template carries a split tag, "train" or "heldout", so evaluation
-sets can use phrasings, rooms, naming styles and units that training never saw.
+The generator holds nothing out. It records every choice it made (words, templates,
+rooms, naming style, units, slot counts) in meta["uses"], and dink/data/split.py routes
+records to train / validation / test sets by those choices (a group split).
 """
 import random
 from dataclasses import dataclass, field, replace
 
-from .scenario import MAX_SLOTS, PROMPT_BYTES, Field, Scenario
+from ..data.scenario import MAX_SLOTS, PROMPT_BYTES, Field, Scenario
 
 
 # ---------------------------------------------------------------- configuration
 @dataclass
-class Split:
-    """What an evaluation set holds out. The default is the training distribution."""
-    words: str = "train"        # synonym / phrase lists
-    templates: str = "train"    # prompt templates
-    rooms: str = "train"        # "heldout": scenarios use rooms never trained (the den)
-    naming: str = "train"       # "heldout": a tool naming style never trained
-    units: str = "F"            # "C": thermostats in Celsius (unseen ranges)
-    state_slots: tuple = (2, 6)
-    tool_slots: tuple = (2, 6)
-    only_none: bool = False     # generate only "nothing relevant" cases
-
-
-def pick(rng, options, split):
-    """options: [(item, split_tag)]. Items of the requested split, falling back to train."""
-    pool = [o for o, s in options if s == split] or [o for o, s in options if s == "train"]
-    return rng.choice(pool)
+class GenConfig:
+    celsius: float = 0.15       # share of houses with Celsius thermostats
+    state_slots: tuple = (2, 8)
+    tool_slots: tuple = (2, 8)
 
 
 # ---------------------------------------------------------------- the house
@@ -39,13 +28,14 @@ class Room:
 
 
 ROOMS = [
-    Room("lr", [("living room", "train"), ("lounge", "train"), ("family room", "heldout")]),
-    Room("kit", [("kitchen", "train")]),
-    Room("bed", [("bedroom", "train"), ("master bedroom", "heldout")]),
-    Room("ofc", [("office", "train"), ("study", "heldout")]),
-    Room("bth", [("bathroom", "train"), ("bath", "train"), ("washroom", "heldout")]),
+    Room("lr", ["living room", "lounge", "family room"]),
+    Room("kit", ["kitchen"]),
+    Room("bed", ["bedroom", "master bedroom"]),
+    Room("ofc", ["office", "study"]),
+    Room("bth", ["bathroom", "bath", "washroom"]),
 ]
-HELDOUT_ROOMS = [Room("den", [("den", "train")])]
+ROOMS.append(Room("den", ["den"]))
+ROOM_CODES = {r.code for r in ROOMS}
 
 
 @dataclass
@@ -62,22 +52,22 @@ class Kind:
 
 KINDS = {
     "lite": Kind("lite", 0, 1, {"small": 0.15, "default": 0.3, "big": 0.6},
-                 nouns=[("lights", "train"), ("light", "train"), ("lamps", "heldout")],
-                 up=[("brighter", "train"), ("lighter", "train"), ("more lit", "heldout")],
-                 down=[("dimmer", "train"), ("darker", "train"), ("less bright", "heldout")]),
+                 nouns=["lights", "light", "lamps"],
+                 up=["brighter", "lighter", "more lit"],
+                 down=["dimmer", "darker", "less bright"]),
     "temp": Kind("temp", 60, 85, {"small": 1, "default": 3, "big": 6}, integer=True,
-                 nouns=[("thermostat", "train"), ("heat", "train"), ("temperature", "train"),
-                        ("ac", "train"), ("climate", "heldout")],
-                 up=[("warmer", "train"), ("hotter", "train"), ("toastier", "heldout")],
-                 down=[("cooler", "train"), ("colder", "train"), ("chillier", "heldout")]),
+                 nouns=["thermostat", "heat", "temperature",
+                        "ac", "climate"],
+                 up=["warmer", "hotter", "toastier"],
+                 down=["cooler", "colder", "chillier"]),
     "fan": Kind("fan", 0, 3, {"small": 1, "default": 1, "big": 2}, integer=True,
-                nouns=[("fan", "train"), ("ceiling fan", "heldout")],
-                up=[("faster", "train"), ("stronger", "train"), ("harder", "heldout")],
-                down=[("slower", "train"), ("gentler", "heldout")]),
+                nouns=["fan", "ceiling fan"],
+                up=["faster", "stronger", "harder"],
+                down=["slower", "gentler"]),
     "blnd": Kind("blnd", 0, 1, {"small": 0.2, "default": 0.5, "big": 1.0},
-                 nouns=[("blinds", "train"), ("shades", "train"), ("curtains", "heldout")],
-                 up=[("more open", "train"), ("wider", "heldout")],
-                 down=[("more closed", "train"), ("less open", "heldout")]),
+                 nouns=["blinds", "shades", "curtains"],
+                 up=["more open", "wider"],
+                 down=["more closed", "less open"]),
 }
 CELSIUS = replace(KINDS["temp"], lo=16, hi=30, steps={"small": 1, "default": 2, "big": 3})
 
@@ -85,27 +75,56 @@ CELSIUS = replace(KINDS["temp"], lo=16, hi=30, steps={"small": 1, "default": 2, 
 HOUSE = {
     "front": dict(canon="frnt_lck", names={"same": "frnt_lck", "swap": "lck_frnt", "set": "set_flck",
                                            "dot": "frnt.lk"},
-                  words=[("front door", "train"), ("main door", "heldout")], lock=True),
+                  words=["front door", "main door"], lock=True),
     "back": dict(canon="back_lck", names={"same": "back_lck", "swap": "lck_back", "set": "set_blck",
                                           "dot": "back.lk"},
-                 words=[("back door", "train"), ("rear door", "heldout")], lock=True),
+                 words=["back door", "rear door"], lock=True),
     "garage": dict(canon="gar_door", names={"same": "gar_door", "swap": "door_gar", "set": "set_gdor",
                                             "dot": "gar.dr"},
-                   words=[("garage door", "train"), ("garage", "train"), ("carport door", "heldout")],
+                   words=["garage door", "garage", "carport door"],
                    lock=False),
 }
 SCENES = {  # tool name -> [(phrase, split)]
-    "goodnite": [("goodnight", "train"), ("time for bed", "train"), ("nighty night", "heldout")],
-    "away": [("we're leaving", "train"), ("i'm heading out", "train"), ("see you later house", "heldout")],
-    "all_off": [("turn everything off", "train"), ("shut it all down", "heldout")],
+    "goodnite": ["goodnight", "time for bed", "nighty night"],
+    "away": ["we're leaving", "i'm heading out", "see you later house"],
+    "all_off": ["turn everything off", "shut it all down"],
 }
 DISTRACTORS = [  # state fields that never matter for the request
     ("out_tmp", -10, 110), ("humid", 0, 100), ("hour", 0, 23), ("aqi", 0, 300),
     ("batt_pct", 0, 100), ("co2_ppm", 400, 2000),
 ]
 
-TRAIN_STYLES = ["same", "swap", "set"]
-HELDOUT_STYLES = ["dot"]
+STYLES = ["same", "swap", "set", "dot"]
+
+
+KIND_CODES = {"lite": "lite", "lit": "lite", "l": "lite", "temp": "temp", "tem": "temp", "t": "temp",
+              "fan": "fan", "f": "fan", "blnd": "blnd", "bln": "blnd", "b": "blnd"}
+
+
+def split_name(name):
+    """(room, kind) of a room-device name in any naming style, else (None, None)."""
+    for sep in ("_", "."):
+        if sep in name:
+            a, b = name.split(sep, 1)
+            if a == "set" and b[:-1] in ROOM_CODES and b[-1] in KIND_CODES:     # set_kitl
+                return b[:-1], KIND_CODES[b[-1]]
+            if a in ROOM_CODES and b in KIND_CODES:                             # kit_lite, kit.lit
+                return a, KIND_CODES[b]
+            if b in ROOM_CODES and a in KIND_CODES:                             # lite_kit
+                return b, KIND_CODES[a]
+    return None, None
+
+
+def room_of(name):
+    if name.startswith("occ_"):
+        return name[4:]
+    return split_name(name)[0]
+
+
+def kind_of(name):
+    if name.startswith("occ_"):
+        return None
+    return split_name(name)[1]
 
 
 def tool_name(style, room, kind):
@@ -124,74 +143,74 @@ def tool_name(style, room, kind):
 # {dev} device noun, {room} "kitchen " or "", {loc} trailing " in the kitchen" (a movable
 # chunk), {cmp} comparative word, {int} intensity prefix ("a little "), {pol} politeness.
 INTENSITY = {
-    "small": [("a little ", "train"), ("slightly ", "train"), ("a bit ", "train"), ("a touch ", "heldout")],
-    "big": [("a lot ", "train"), ("way ", "train"), ("much ", "train"), ("a whole lot ", "heldout")],
-    "default": [("", "train")],
+    "small": ["a little ", "slightly ", "a bit ", "a touch "],
+    "big": ["a lot ", "way ", "much ", "a whole lot "],
+    "default": [""],
 }
-POLITE = [("", "train"), ("", "train"), ("please ", "train"), ("could you ", "train"),
-          ("hey ", "train"), ("can you ", "train"), ("would you mind ", "heldout")]
+POLITE = ["", "", "please ", "could you ",
+          "hey ", "can you ", "would you mind "]
 
 RELATIVE = [  # direction-neutral templates; {cmp} carries the direction
-    ("{pol}make the {room}{dev} {int}{cmp}", "train"),
-    ("{pol}make it {int}{cmp}{loc}", "train"),
-    ("{pol}set the {room}{dev} {int}{cmp}", "train"),
-    ("i want the {room}{dev} {int}{cmp}", "train"),
-    ("{room}{dev} {int}{cmp}", "train"),
-    ("{int}{cmp} {room}{dev} please", "heldout"),
-    ("{pol}get the {room}{dev} {int}{cmp}", "heldout"),
+    "{pol}make the {room}{dev} {int}{cmp}",
+    "{pol}make it {int}{cmp}{loc}",
+    "{pol}set the {room}{dev} {int}{cmp}",
+    "i want the {room}{dev} {int}{cmp}",
+    "{room}{dev} {int}{cmp}",
+    "{int}{cmp} {room}{dev} please",
+    "{pol}get the {room}{dev} {int}{cmp}",
 ]
 TURN = {  # absolute on/off style requests per (kind, on?)
-    ("lite", True): [("{pol}turn on the {room}{dev}", "train"), ("{pol}switch on the {room}{dev}", "train"),
-                     ("{room}{dev} on", "train"), ("lights on{loc}", "train"),
-                     ("{pol}flip the {room}{dev} on", "heldout")],
-    ("lite", False): [("{pol}turn off the {room}{dev}", "train"), ("{pol}switch off the {room}{dev}", "train"),
-                      ("{room}{dev} off", "train"), ("kill the {room}{dev}", "train"),
-                      ("{pol}shut off the {room}{dev}", "heldout")],
-    ("fan", True): [("{pol}turn on the {room}{dev}", "train"), ("start the {room}{dev}", "train"),
-                    ("{pol}fire up the {room}{dev}", "heldout")],
-    ("fan", False): [("{pol}turn off the {room}{dev}", "train"), ("stop the {room}{dev}", "train"),
-                     ("{pol}shut down the {room}{dev}", "heldout")],
-    ("blnd", True): [("{pol}open the {room}{dev}", "train"), ("{room}{dev} up", "train"),
-                     ("{pol}raise the {room}{dev}", "heldout")],
-    ("blnd", False): [("{pol}close the {room}{dev}", "train"), ("{room}{dev} down", "train"),
-                      ("{pol}lower the {room}{dev}", "heldout")],
+    ("lite", True): ["{pol}turn on the {room}{dev}", "{pol}switch on the {room}{dev}",
+                     "{room}{dev} on", "lights on{loc}",
+                     "{pol}flip the {room}{dev} on"],
+    ("lite", False): ["{pol}turn off the {room}{dev}", "{pol}switch off the {room}{dev}",
+                      "{room}{dev} off", "kill the {room}{dev}",
+                      "{pol}shut off the {room}{dev}"],
+    ("fan", True): ["{pol}turn on the {room}{dev}", "start the {room}{dev}",
+                    "{pol}fire up the {room}{dev}"],
+    ("fan", False): ["{pol}turn off the {room}{dev}", "stop the {room}{dev}",
+                     "{pol}shut down the {room}{dev}"],
+    ("blnd", True): ["{pol}open the {room}{dev}", "{room}{dev} up",
+                     "{pol}raise the {room}{dev}"],
+    ("blnd", False): ["{pol}close the {room}{dev}", "{room}{dev} down",
+                      "{pol}lower the {room}{dev}"],
 }
 INDIRECT = {  # (kind, up?) -> [(text, intensity, split)] -- the speaker's condition implies the change
-    ("temp", True): [("i'm cold{loc}", "default", "train"), ("i'm freezing{loc}", "big", "train"),
-                     ("it's a bit chilly{loc}", "small", "train"), ("it's cold{loc}", "default", "train"),
-                     ("brr it's frigid{loc}", "big", "heldout")],
-    ("temp", False): [("i'm hot{loc}", "default", "train"), ("it's so hot{loc}", "default", "train"),
-                      ("it's stuffy{loc}", "small", "train"), ("i'm burning up{loc}", "big", "train"),
-                      ("i'm roasting{loc}", "big", "heldout")],
-    ("lite", True): [("it's too dark{loc}", "default", "train"), ("i can't see{loc}", "big", "train"),
-                     ("it's gloomy{loc}", "default", "heldout")],
-    ("lite", False): [("it's too bright{loc}", "default", "train"), ("the light hurts my eyes", "big", "train"),
-                      ("the glare is awful{loc}", "default", "heldout")],
+    ("temp", True): [("i'm cold{loc}", "default"), ("i'm freezing{loc}", "big"),
+                     ("it's a bit chilly{loc}", "small"), ("it's cold{loc}", "default"),
+                     ("brr it's frigid{loc}", "big")],
+    ("temp", False): [("i'm hot{loc}", "default"), ("it's so hot{loc}", "default"),
+                      ("it's stuffy{loc}", "small"), ("i'm burning up{loc}", "big"),
+                      ("i'm roasting{loc}", "big")],
+    ("lite", True): [("it's too dark{loc}", "default"), ("i can't see{loc}", "big"),
+                     ("it's gloomy{loc}", "default")],
+    ("lite", False): [("it's too bright{loc}", "default"), ("the light hurts my eyes", "big"),
+                      ("the glare is awful{loc}", "default")],
 }
 NUMERIC = {  # absolute numeric requests; {num} rendered per kind
-    "temp": [("{pol}set the {room}{dev} to {num}", "train"), ("{room}{dev} {num} degrees", "train"),
-             ("make it {num}{loc}", "train"), ("{pol}put the {room}{dev} at {num}", "heldout")],
-    "lite": [("{pol}set the {room}{dev} to {num} percent", "train"), ("{room}{dev} at {num} percent", "train"),
-             ("{pol}dim the {room}{dev} to {num} percent", "heldout")],
-    "fan": [("{pol}set the {room}{dev} to {num}", "train"), ("{room}{dev} speed {num}", "train"),
-            ("{pol}put the {room}{dev} on {num}", "heldout")],
+    "temp": ["{pol}set the {room}{dev} to {num}", "{room}{dev} {num} degrees",
+             "make it {num}{loc}", "{pol}put the {room}{dev} at {num}"],
+    "lite": ["{pol}set the {room}{dev} to {num} percent", "{room}{dev} at {num} percent",
+             "{pol}dim the {room}{dev} to {num} percent"],
+    "fan": ["{pol}set the {room}{dev} to {num}", "{room}{dev} speed {num}",
+            "{pol}put the {room}{dev} on {num}"],
 }
 LOCKS = {
-    ("lock", True): [("{pol}lock the {dev}", "train"), ("lock up the {dev}", "train"),
-                     ("{pol}secure the {dev}", "heldout")],
-    ("lock", False): [("{pol}unlock the {dev}", "train"), ("let me in the {dev}", "train"),
-                      ("{pol}unbolt the {dev}", "heldout")],
-    ("door", True): [("{pol}open the {dev}", "train"), ("{dev} up", "train"), ("{pol}raise the {dev}", "heldout")],
-    ("door", False): [("{pol}close the {dev}", "train"), ("{dev} down", "train"), ("{pol}shut the {dev}", "heldout")],
+    ("lock", True): ["{pol}lock the {dev}", "lock up the {dev}",
+                     "{pol}secure the {dev}"],
+    ("lock", False): ["{pol}unlock the {dev}", "let me in the {dev}",
+                      "{pol}unbolt the {dev}"],
+    ("door", True): ["{pol}open the {dev}", "{dev} up", "{pol}raise the {dev}"],
+    ("door", False): ["{pol}close the {dev}", "{dev} down", "{pol}shut the {dev}"],
 }
-OFF_DOMAIN = [("what time is it", "train"), ("play some jazz", "train"), ("tell me a joke", "train"),
-              ("add milk to the shopping list", "train"), ("what's the weather tomorrow", "train"),
-              ("call mom", "train"), ("set a timer for ten minutes", "train"), ("how are you", "train"),
-              ("who won the game last night", "heldout"), ("order a pizza", "heldout"),
-              ("remind me to water the plants", "heldout"), ("what's on my calendar", "heldout")]
-QUESTIONS = [("is the {dev} locked", "train"), ("are the {room}{dev} on", "train"),
-             ("what's the temperature{loc}", "train"), ("is the {dev} open", "train"),
-             ("did i leave the {room}{dev} on", "heldout")]
+OFF_DOMAIN = ["what time is it", "play some jazz", "tell me a joke",
+              "add milk to the shopping list", "what's the weather tomorrow",
+              "call mom", "set a timer for ten minutes", "how are you",
+              "who won the game last night", "order a pizza",
+              "remind me to water the plants", "what's on my calendar"]
+QUESTIONS = ["is the {dev} locked", "are the {room}{dev} on",
+             "what's the temperature{loc}", "is the {dev} open",
+             "did i leave the {room}{dev} on"]
 
 
 # ---------------------------------------------------------------- building blocks
@@ -232,22 +251,26 @@ class Device:
 
 
 class HomeGen:
-    def __init__(self, split: Split = None, seed: int = 0):
-        self.sp = split or Split()
+    def __init__(self, cfg: GenConfig = None, seed: int = 0):
+        self.cfg = cfg or GenConfig()
         self.rng = random.Random(seed)
+        self.uses = {}
 
     # -- helpers
     def w(self, options):
-        return pick(self.rng, options, self.sp.words)
+        """Pick a word/phrase and record it (the splitter may hold it out)."""
+        x = self.rng.choice(options)
+        self.uses["words"].append(x)
+        return x
 
     def t(self, options):
-        return pick(self.rng, options, self.sp.templates)
+        """Pick a template and record it. Items may be (text, extra) tuples."""
+        x = self.rng.choice(options)
+        self.uses["templates"].append(x[0] if isinstance(x, tuple) else x)
+        return x
 
     def kind(self, key):
-        return CELSIUS if key == "temp" and self.sp.units == "C" else KINDS[key]
-
-    def rooms(self):
-        return HELDOUT_ROOMS + self.rng.sample(ROOMS, 2) if self.sp.rooms == "heldout" else ROOMS
+        return CELSIUS if key == "temp" and self.uses["units"] == "C" else KINDS[key]
 
     def random_value(self, k: Kind):
         if k.integer:
@@ -257,10 +280,7 @@ class HomeGen:
     def build_house(self):
         """A random set of devices with current values."""
         rng, devs = self.rng, []
-        rooms = self.rooms()
-        n_rooms = rng.randint(1, min(4, len(rooms)))
-        chosen = rooms[:1] + rng.sample(rooms[1:], n_rooms - 1) if self.sp.rooms == "heldout" \
-            else rng.sample(rooms, n_rooms)
+        chosen = rng.sample(ROOMS, rng.randint(1, 4))
         for r in chosen:
             for key in rng.sample(list(KINDS), rng.randint(1, len(KINDS))):
                 k = self.kind(key)
@@ -272,7 +292,7 @@ class HomeGen:
         return devs, chosen
 
     def room_words(self, code):
-        for r in ROOMS + HELDOUT_ROOMS:
+        for r in ROOMS:
             if r.code == code:
                 return self.w(r.words)
         raise KeyError(code)
@@ -293,12 +313,13 @@ class HomeGen:
 
     def _try(self):
         rng = self.rng
-        intents = [(n, w) for n, w in self.INTENTS if not self.sp.only_none or n.startswith("none")]
-        intent = rng.choices([n for n, _ in intents], [w for _, w in intents])[0]
+        intent = rng.choices([n for n, _ in self.INTENTS], [w for _, w in self.INTENTS])[0]
+        style = rng.choice(STYLES)
+        self.uses = {"words": [], "templates": [], "style": style,
+                     "units": "C" if rng.random() < self.cfg.celsius else "F"}
         devs, rooms = self.build_house()
-        style = rng.choice(HELDOUT_STYLES if self.sp.naming == "heldout" else TRAIN_STYLES)
-        n_tools = rng.randint(*self.sp.tool_slots)
-        n_state = rng.randint(*self.sp.state_slots)
+        n_tools = rng.randint(*self.cfg.tool_slots)
+        n_state = rng.randint(*self.cfg.state_slots)
         return getattr(self, "_" + intent.split("_")[0])(intent, devs, rooms, style, n_tools, n_state)
 
     # ---------------------------------------------------------------- tools and state
@@ -326,7 +347,7 @@ class HomeGen:
             scene = rng.choice(list(SCENES))
             if all(t.name != scene for t in tools):
                 tools.append(Field(scene, 0, 0, 0, arg=False))
-        if len(tools) > min(MAX_SLOTS, self.sp.tool_slots[1]):
+        if len(tools) > min(MAX_SLOTS, self.cfg.tool_slots[1]):
             return None, None
         # state: needed fields, occupancy, then other devices, then distractors
         state = {}
@@ -344,7 +365,7 @@ class HomeGen:
             if len(state) >= n_state:
                 break
             state[name] = Field(name, float(rng.randint(lo, hi)), lo, hi)
-        if len(state) > min(MAX_SLOTS, self.sp.state_slots[1]):
+        if len(state) > min(MAX_SLOTS, self.cfg.state_slots[1]):
             return None, None
         return tools, list(state.values())
 
@@ -389,17 +410,18 @@ class HomeGen:
         if not target_idx:
             target[-1] = 1.0
         self.rng.shuffle(state)
+        uses = dict(self.uses, n_state=len(state), n_tools=len(tools),
+                    rooms=sorted({code for f in state + tools for code in [room_of(f.name)] if code}),
+                    kinds=sorted({k for f in state + tools for k in [kind_of(f.name)] if k}))
         return Scenario(state, prompt, tools, target,
                         {"intent": intent, "cls": cls, "room": room, "ambiguous": ambiguous,
-                         "needed": list(needed), "chunks": chunks, "split": vars(self.sp)})
+                         "needed": list(needed), "chunks": chunks, "uses": uses})
 
     # ---------------------------------------------------------------- room resolution
     def resolve(self, devs, rooms_with_kind):
         """Decide whether the prompt names the room. Without a name, occupancy sensors may
         pick one room; otherwise the request is ambiguous across the plausible rooms."""
         rng = self.rng
-        if self.sp.rooms == "heldout":          # the point of that set: requests about the new room
-            return True, {}, None
         mention = rng.random() < 0.65 or len(rooms_with_kind) == 1 and rng.random() < 0.5
         occ = {}
         if not mention and len(rooms_with_kind) > 1 and rng.random() < 0.6:
@@ -413,8 +435,6 @@ class HomeGen:
     # ---------------------------------------------------------------- intents
     def _pick_device(self, devs, kinds):
         cands = [d for d in devs if d.kind in kinds and d.room not in HOUSE]
-        if self.sp.rooms == "heldout":
-            cands = [d for d in cands if d.room in {r.code for r in HELDOUT_ROOMS}]
         return self.rng.choice(cands) if cands else None
 
     def _relative(self, intent, devs, rooms, style, n_tools, n_state, force_limit=False):
@@ -512,7 +532,7 @@ class HomeGen:
         if d is None:
             return None
         up = rng.random() < 0.5
-        text, intensity = pick(rng, [((t, i), s) for t, i, s in INDIRECT[(d.kind, up)]], self.sp.templates)
+        text, intensity = self.t(INDIRECT[(d.kind, up)])
         direction = 1 if up else -1
         same_kind = [x for x in devs if x.kind == d.kind and x.room not in HOUSE]
         mention, occ, plausible = self.resolve(devs, [x.room for x in same_kind])
@@ -561,8 +581,7 @@ class HomeGen:
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, [d])
         same_kind_rooms = {x.room for x in devs if x.kind == d.kind and x.room not in HOUSE}
         prompt, chunks = self.render(self.t(NUMERIC[d.kind]), dev=self.w(k.nouns), room_code=d.room, num=num,
-                                     mention_room=(self.sp.rooms == "heldout" or len(same_kind_rooms) > 1
-                                                   or rng.random() < 0.5))
+                                     mention_room=len(same_kind_rooms) > 1 or rng.random() < 0.5)
         return self.finish(intent, "numeric", tools, state, target, prompt, chunks, room=d.room,
                            needed=[d.canon])
 

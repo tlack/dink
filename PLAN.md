@@ -115,13 +115,12 @@ numbers. Train on CPU (the model is tiny; the laptop GPU is optional and runs ho
 
 ### Domain: a smart home
 
-Built: `dink/home.py`, described in [`docs/scenarios.md`](docs/scenarios.md). Lights,
+Built: `dink/gen/home.py` (+ the splitter `dink/data/split.py`), described in [`docs/scenarios.md`](docs/scenarios.md). Lights,
 blinds, thermostats and fans in up to four rooms, locks and a garage door, scenes, and
 distractor sensors. It covers room ambiguity (resolved by room words or occupancy
 sensors, or split probability when neither helps), relative / absolute / indirect /
 numeric requests, requests at a device's limit, missing devices, questions, off-domain
-requests, near-miss tools, and several tool naming styles. Stage 2 (`dink/augment.py`)
-adds answer-preserving variations each time a scenario is drawn.
+requests, near-miss tools, and several tool naming styles. Stage 2 (`dink/gen/augment.py`) adds answer-preserving variations each time a scenario is drawn.
 
 **Data:** 1,000 base examples, plus augmentation applied every time an example is drawn.
 

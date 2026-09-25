@@ -1,93 +1,92 @@
+import json
 import random
 
 import numpy as np
 import pytest
 
-from dink import augment as A
-from dink.encode import batch
-from dink.gen import EVAL_SETS, TRAIN, generate
-from dink.home import HomeGen, Split
-from dink.scenario import Scenario
+from dink.data.encode import batch
+from dink.data.scenario import Scenario
+from dink.data.split import AXES, split, touches
+from dink.gen import augment as A
+from dink.gen.__main__ import generate
+from dink.gen.home import split_name
 
-
-def canon(tool_name):
-    """Map any naming style back to the canonical state name (room + kind)."""
-    kinds = {"lite": "lite", "lit": "lite", "l": "lite", "temp": "temp", "tem": "temp", "t": "temp",
-             "fan": "fan", "f": "fan", "blnd": "blnd", "bln": "blnd", "b": "blnd"}
-    for sep in ("_", "."):
-        if sep in tool_name:
-            a, b = tool_name.split(sep, 1)
-            if a == "set":                                  # set_kitl
-                return f"{b[:-1]}_{kinds[b[-1]]}"
-            if a in kinds and len(a) == 4 or a == "fan":    # lite_kit
-                return f"{b}_{kinds[a]}"
-            return f"{a}_{kinds.get(b, b)}"
-    return tool_name
+CFG = json.load(open("configs/home_split.json"))
 
 
 @pytest.fixture(scope="module")
-def train():
-    return generate(TRAIN, 3000, 7)
+def pool():
+    return generate(6000, 7)
 
 
-def test_invariants_all_sets():
-    for name, (split, recipe) in EVAL_SETS.items():
-        for s in generate(split, 300, 11, recipe):
-            s.check()
-            lo, hi = split.tool_slots
-            assert len(s.tools) <= hi, name
+def test_invariants(pool):
+    for s in pool:
+        s.check()
+        assert set(s.meta["uses"]) >= {"words", "templates", "rooms", "kinds", "style", "units"}
 
 
-def test_relative_moves_the_right_way(train):
+def test_relative_moves_the_right_way(pool):
     checked = 0
-    for s in train:
+    for s in pool:
         if s.meta["cls"].startswith(("relative", "indirect")) and not s.meta["ambiguous"] \
                 and s.label < len(s.tools):
             t = s.tools[s.label]
-            cur = {f.name: f.value for f in s.state}[canon(t.name)]
+            room, kind = split_name(t.name)
+            cur = {f.name: f.value for f in s.state}[f"{room}_{kind}"]
             assert (t.value - cur) * s.meta["dir"] > 0, s.show()
             checked += 1
-    assert checked > 300
+    assert checked > 500
 
 
-def test_limit_and_none_cases_answer_nothing(train):
-    for s in train:
+def test_limit_and_none_cases_answer_nothing(pool):
+    for s in pool:
         if s.meta["cls"] == "limit" or s.meta["cls"].startswith("none"):
             assert s.label == len(s.tools), s.show()
 
 
-def test_class_mix(train):
-    none = sum(s.label == len(s.tools) for s in train) / len(train)
-    amb = sum(bool(s.meta["ambiguous"]) for s in train) / len(train)
-    assert 0.1 < none < 0.35
-    assert 0.02 < amb < 0.3
+def test_class_mix(pool):
+    none = sum(s.label == len(s.tools) for s in pool) / len(pool)
+    amb = sum(bool(s.meta["ambiguous"]) for s in pool) / len(pool)
+    assert 0.1 < none < 0.35 and 0.02 < amb < 0.3
 
 
-def test_augment_preserves_answer(train):
+def test_augment_preserves_answer(pool):
     rng = random.Random(3)
+
     def dist(x):
         d = {(t.name, t.value): p for t, p in zip(x.tools, x.target) if p > 0}
         d["nothing"] = x.target[-1]
         return d
-    for s in train[:500]:
+    for s in pool[:800]:
         assert dist(A.augment(s, rng)) == dist(s)
 
 
-def test_heldout_sets_differ():
-    rooms = generate(EVAL_SETS["h_rooms"][0], 100, 5)
-    den = [s for s in rooms if s.meta["room"] == "den"]
-    assert len(den) > 40
-    assert all(any(f.name.startswith("den") for f in s.state + s.tools) and "den" in s.prompt for s in den)
-    naming = generate(EVAL_SETS["h_naming"][0], 100, 5)
-    assert all("." in t.name for s in naming for t in s.tools if t.arg and "_" not in t.name[:3])
-    celsius = generate(EVAL_SETS["h_range"][0], 100, 5)
-    temps = [f for s in celsius for f in s.state if f.name.endswith("_temp")]
-    assert temps and all(f.lo == 16 and f.hi == 30 for f in temps)
+def test_split_no_leaks_and_all_axes(pool):
+    sets, held = split(pool, CFG, seed=0, n_train=1000)
+    assert 200 < len(sets["train"]) <= 1000 and sets["val"] and sets["test_indist"]
+    for axis in ("words", "templates", "rooms", "styles", "units", "slots"):
+        assert len(sets.get("test_" + axis, [])) > 30, axis
+    heldset = {a: set(v) for a, v in held.items()}
+    for s in sets["train"] + sets["val"]:
+        u = s.meta["uses"]
+        assert not set(u["words"]) & heldset["words"]
+        assert not set(u["templates"]) & heldset["templates"]
+        assert "den" not in u["rooms"] and u["style"] != "dot" and u["units"] != "C"
+        assert u["n_state"] <= 6 and u["n_tools"] <= 6
 
 
-def test_json_roundtrip_and_encode(train):
-    s = train[0]
+def test_sampled_holdouts_are_reproducible(pool):
+    cfg = dict(CFG, sample={"words": 3, "kinds": 1})
+    a = split(pool, cfg, seed=5)[1]
+    b = split(pool, cfg, seed=5)[1]
+    assert a == b and len(a["kinds"]) == 1
+    sets = split(pool, cfg, seed=5)[0]
+    assert all(a["kinds"][0] not in s.meta["uses"]["kinds"] for s in sets["train"])
+
+
+def test_json_roundtrip_and_encode(pool):
+    s = pool[0]
     assert Scenario.from_json(s.to_json()).to_json() == s.to_json()
-    b = batch(train[:64])
+    b = batch(pool[:64])
     assert b["prompt"].shape == (64, 64) and b["tool_name"].shape == (64, 8, 8)
     assert np.allclose(b["target"].sum(1), 1)
