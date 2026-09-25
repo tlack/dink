@@ -113,49 +113,31 @@ between cores). So:
 modest dataset, generalizes to held-out variations, and beats a bytes-only version on
 numbers. Train on CPU (the model is tiny; the laptop GPU is optional and runs hot).
 
-### Domain: "climate room"
+### Domain: a smart home
 
-| state field | range | notes |
-|---|---|---|
-| `ac_set` | 60..85 | thermostat setpoint (°F) |
-| `room_t` | 50..100 | room temperature |
-| `humid` | 0..100 | distractor |
-| `fan` | 0..3 | fan speed |
-| `light` | 0..1 | dimmer |
-| `outdoor`, `hour` | 0..110, 0..23 | distractors |
+Built: `dink/home.py`, described in [`docs/scenarios.md`](docs/scenarios.md). Lights,
+blinds, thermostats and fans in up to four rooms, locks and a garage door, scenes, and
+distractor sensors. It covers room ambiguity (resolved by room words or occupancy
+sensors, or split probability when neither helps), relative / absolute / indirect /
+numeric requests, requests at a device's limit, missing devices, questions, off-domain
+requests, near-miss tools, and several tool naming styles. Stage 2 (`dink/augment.py`)
+adds answer-preserving variations each time a scenario is drawn.
 
-Tools: `set_temp` (60..85), `set_fan` (0..3), `set_lite` (0..1), each offered with 1-4
-candidate values; unused slots empty. Each example samples 2-6 state fields and 2-8 tool
-candidates, in random order.
+**Data:** 1,000 base examples, plus augmentation applied every time an example is drawn.
 
-**Prompts** from a small grammar: direction (colder / warmer / cooler / hotter / brighter /
-dimmer / faster / slower / on / off), intensity (a little, slightly, a bit / a lot, way,
-much / none), indirect forms ("i'm freezing", "it's stuffy", "too bright in here"),
-fillers and politeness ("could you", "please", "hey"), and word-order variants.
-
-**Label rule** (deterministic): target = current value + direction x step(intensity);
-answer = the candidate of the matching tool closest to the target. "Nothing relevant"
-when the prompt is off-domain ("play some jazz", "what time is it"), when no offered tool
-can move in the requested direction (already at the limit, or the tool isn't offered),
-or when the prompt is noise.
-
-**Data:** 1,000 base examples, plus augmentation applied every time an example is drawn:
-shuffle slot order, add/remove distractor fields, resample values within ranges, typos
-(3% of bytes swapped/dropped), case and spacing changes. The base set is small on purpose;
-augmentation supplies variety without new semantics.
-
-### Held-out evaluation sets
+### Held-out evaluation sets (500 each)
 
 | set | what changes | expectation |
 |---|---|---|
-| in-distribution | fresh samples from the training grammar | ~98% |
-| H-range | same names, unseen ranges (e.g. `ac_set` in °C, 16..30) | should hold: tests normalization |
-| H-template | 20% of prompt templates never trained | should mostly hold |
-| H-slots | 7-8 state fields and 8 tools (training uses at most 6) | should hold |
-| H-none | new off-domain prompts | should hold |
-| H-noise | ASR-style errors (simulated now; real BabyTalk transcripts later) | partial |
-| H-words | synonyms never trained ("frigid", "toasty") | expected to fail: motivates teacher init |
-| H-names | renamed fields (`thermo` instead of `ac_set`) | expected to fail: same |
+| `indist` | fresh samples from the training distribution | ~98% |
+| `h_range` | thermostats in Celsius (16..30) | should hold: tests normalization |
+| `h_template` | prompt templates never trained | should mostly hold |
+| `h_slots` | 7-8 state fields and tools (training uses at most 6) | should hold |
+| `h_none` | "nothing relevant" only, unseen off-domain phrases | should mostly hold |
+| `h_noise` | speech-recognition errors, typos, fillers | partial |
+| `h_rooms` | a room never trained (the den) | partial: the name bytes must match the prompt |
+| `h_naming` | a tool naming style never trained (`kit.lit`) | expected weak: motivates teacher init |
+| `h_words` | synonyms never trained ("climate", "chillier") | expected weak: same |
 
 Metrics: top-1 accuracy, "nothing relevant" precision/recall, calibration error, and a
 "right magnitude" rate for numeric picks (chose the small step when asked for "a little").
