@@ -33,10 +33,14 @@ Named after Peter Dinklage: small, and punches far above its size.
 
 | field | size | contents |
 |---|---|---|
-| state | 8 slots | name (8 bytes, NUL padded), value, min, max; empty slots masked |
+| state | 8 slots | name (up to 64 bytes, e.g. "kitchen thermostat"), value, min, max; empty slots masked |
 | prompt | 64 bytes | lowercase text, NUL padded (longer prompts: last 64 bytes) |
-| tools | 8 slots | name (8 bytes), argument value, min, max, has-argument flag; empty slots masked |
+| tools | 8 slots | name (up to 64 bytes), argument value, min, max, has-argument flag; empty slots masked |
 | output | 9 logits | one per tool slot + "nothing relevant"; softmax over the unmasked ones |
+
+Names are encoded once, when a device's state fields and tool list are set up, and their
+vectors are cached; only the prompt and the current values are processed per query. So
+names can be long and descriptive rather than 8-byte abbreviations.
 
 Normalized value = clip((v - min) / (max - min), 0, 1). Categorical values (mode 1/2/3)
 should be text in the name for now ("mode_eco"), not numbers.
@@ -44,38 +48,22 @@ should be text in the name for now ("mode_eco"), not numbers.
 On a device this is just a C struct (~300 bytes). An Erlang/Elixir host (AtomVM) can pass
 `{:state, [{"ac_set", 80, 60, 85}, ...]}` terms straight through.
 
-## 3. Network (v0, D = 64)
+## 3. Network (v1, D = 64)
 
-```
-names (8 state + 8 tool, 8 bytes each) --byte embed 16--> concat 128 --> Linear 128x128 --> ReLU --> Linear 128x64  = name vec
-values (normalized)  --> piecewise-linear encoding, 16 bins + "present" flag --> Linear 17x64                      = value vec
-item token = name vec + value vec + type embedding (state / tool / nothing)
+See [`docs/architecture.md`](docs/architecture.md) for the diagram. In short:
 
-prompt 64 bytes --byte embed 32 + position--> [1x1 32->128] --> 2 x ( depthwise conv k5 + 1x1 128x128 + ReLU )
-                --> attention pooling with 4 learned queries --> 4 prompt tokens x 64
+- **One text encoder T** (byte embedding, depthwise + 1x1 convolutions, attention pooling)
+  for everything textual: the prompt every query (4 tokens), names once per setup (1 vector
+  each, cached). The same layer types as BabyTalk's speech model, so MMRT runs them.
+- **Value encoder V + fuse F:** each normalized value becomes 18 features (16 piecewise-linear
+  bins, magnitude, has-value) and is mixed with its name vector in a small MLP, so an item
+  token can mean "thermostat, set low" before any later layer sees it (early fusion).
+- **Relation step:** each tool finds its state field by attention over name vectors, and
+  gets Δ = tool value − state value as extra features.
+- **Mixer:** 21 tokens (8 state, 4 prompt, 8 tool, 1 "nothing"), 2 attention blocks (or one
+  block applied 3 times), then a scorer and a masked softmax over 9 outputs.
 
-relation features (per tool): tool name vec . state name vecs --> softmax --> attended state value
-                --> delta = tool value - attended value --> PLE(delta in -1..1) --> Linear --> added to the tool token
-
-mixer: 21 tokens (8 state + 4 prompt + 8 tool + 1 "nothing") x 64
-       2 blocks: attention (4 heads x 16) + FFN 64 -> 256 -> 64, pre-norm
-scorer: Linear 64 -> 1 on the 8 tool tokens and the "nothing" token --> masked softmax
-```
-
-| part | parameters | multiply-adds per decision |
-|---|---|---|
-| name encoder (shared, 16 names) | 29 K | 0.39 M |
-| value + relation encoders | 2 K | 0.03 M |
-| prompt encoder (conv) + pooling | 66 K | 3.5 M |
-| mixer, 2 blocks | 99 K | 2.2 M |
-| scorer, type/NONE embeddings | 1 K | < 0.01 M |
-| **total** | **~200 K (~200 KB int8)** | **~6 M** |
-
-At the 1-3 billion multiply-adds per second MMRT sustains on the S3, that is a few
-milliseconds of math; fixed per-layer overheads will likely dominate, so plan on ~10 ms.
-
-The prompt encoder is deliberately the same depthwise + 1x1 pattern as the BabyTalk speech
-model: it runs on MMRT's existing kernels. The mixer's attention (21 tokens) is new but tiny.
+~190 K parameters, ~6 M multiply-adds per query, ~10 ms on the ESP32-S3 (estimate).
 
 ## 4. Shaping it for the ESP32 (wide, not deep)
 
@@ -154,9 +142,16 @@ If B cannot learn one hand-coded domain, stop and rethink before generating more
 
 ## 7. Then: world knowledge and more domains
 
-- **Teacher initialization:** before decision training, train the name and prompt encoders
-  to reproduce a sentence-embedding model's vectors (projected down to 64 floats) over lots
-  of short phrases and identifiers. Target: H-words and H-names go from failing to passing.
+- **Teacher initialization (next step):** before decision training, distill a sentence-embedding
+  teacher into the text encoder: the same text goes to both, and the student learns to
+  match the teacher's vector (cut to 64 dims) and its similarity structure within a batch.
+  Also distill fused item tokens toward the teacher's embedding of verbalized items
+  ("kitchen thermostat, set low", "light at full brightness"), so values carry meaning early.
+- **Choosing the teacher by test:** candidates EmbeddingGemma-300M, Qwen3-Embedding-0.6B,
+  bge-small-en-v1.5, multilingual-e5-base, scored on our own probes: matching requests to
+  tool descriptions, separating in-catalog from out-of-catalog requests (abstention is the
+  hard part: "Selection Is Retrieval, Abstention Is Not", arXiv 2609.18672), and placing
+  verbalized values near the right words.
 - **More domains via OpenRouter:** have a frontier model propose domains, fields, ranges,
   tools and prompt phrasings as structured specs; we turn each spec into a generator like
   the hand-coded one. The LLM supplies breadth; code supplies volume and exact labels.
@@ -181,6 +176,12 @@ If B cannot learn one hand-coded domain, stop and rethink before generating more
 Export to MMRT (int8), add the attention op, run on the ESP32-S3, and wire
 BabyTalk speech -> Dink -> action, with BabyTalk's voice saying "sorry, which did you
 mean?" when Dink answers "nothing relevant" or is unsure.
+
+## Later ideas
+
+- **Primitive vision through the state:** state fields as image statistics (average
+  brightness, per-channel color, quadrant hues, edge-orientation counts) from a camera
+  frame, e.g. car vs. plane. Needs more state slots (16-64) and good hand-made features.
 
 ## Open questions
 
