@@ -2,7 +2,7 @@
 
 Training data for Dink comes from scenario generators: code that builds a situation,
 a request, the tools on offer, and the provably right answer. The first one models a
-smart home (`dink/home.py`).
+smart home (`dink/gen/home.py`).
 
 ## Three pieces
 
@@ -42,7 +42,7 @@ Tests check this, and check that nothing held out leaks into train or val.
 | naming conventions | `kit_lite`, `lite_kit`, `set_kitl` | three training styles, one held out (`kit.lit`) |
 
 Devices: lights and blinds (0..1), thermostats (60..85 °F), fans (0..3) in up to four of
-five rooms, plus front/back locks and a garage door. Distractor state fields (outdoor
+six rooms (the den is normally held out), plus front/back locks and a garage door. Distractor state fields (outdoor
 temperature, humidity, hour, air quality, battery, CO2) never matter to the answer.
 
 Current training mix (1,000 examples): 22% "nothing relevant", 4% ambiguous; prompts up to
