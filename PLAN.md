@@ -189,6 +189,36 @@ mean?" when Dink answers "nothing relevant" or is unsure.
   and cached, fused like a numeric value; (c) two passes: pick `play_music`, then run Dink
   again with the genres as its options (pages of 8 for long lists). Leaning (b) + (c).
 
+- **Beyond the microcontroller: Jev-style workloads** (noted 2026-09-26; parked until the
+  gadget case works). Dink is a small decision model for any problem, not just physical
+  control. Mapping:
+  - tools = labels as no-value actions (`spam`, `route_to_code_model`, `flag_harassment`);
+  - state = the numeric metadata text classifiers ignore (sender reputation, account age,
+    link count, length, hour);
+  - "nothing relevant" = abstain / escalate to a bigger model;
+  - labels are encoded names, so a trained Dink can pick among labels it has never seen.
+    That's the Jev claim worth proving.
+
+  Order when we get there:
+  1. Intent classification with held-out intents: CLINC150 / MASSIVE (already downloaded),
+     Banking77; sample 8 intents per example.
+  2. A skill router built from the 1,000 LLM worlds (tools = world names; free).
+  3. Spam: UCI SMS Spam.
+  4. Moderation (Jigsaw / Civil Comments) and LLM routing (arena preference data). These
+     need longer prompts, 256 bytes: linear cost in the conv encoder, 4x per query on the
+     ESP32.
+
+  Verify each dataset before relying on it. Open question: capacity. Does one 204K model
+  improve from mixing domains or run out of room? Measure it on the gadget test sets, with a
+  wider model as the fallback.
+
+- **Cascades of Dinks** (noted 2026-09-26). The first Dink picks a skill; later Dinks pick
+  parameters. This handles more than 8 options (category, then subcategory). Tools needn't
+  be actuators: a severity level, a confidence band, a response budget are candidate values
+  within declared ranges, which Dink already supports. Modeling such decompositions is also
+  a source of more diverse training inputs. On the device, stages run in sequence
+  (about 2x compute per decision).
+
 ## Open questions
 
 - Prompts with explicit numbers ("set it to 72"): **answered, extract them.** Even the
