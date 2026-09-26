@@ -194,8 +194,13 @@ mean?" when Dink answers "nothing relevant" or is unsure.
 - Prompts with explicit numbers ("set it to 72"): **answered, extract them.** Even the
   600M-parameter teacher places "set the thermostat to 83" no nearer "warm" than "cold"
   (0.51 on 59 unseen numbers), so distillation cannot teach digits. The harness should pull
-  numbers out of the prompt into a numeric slot, where the value path (trained on LLM value
-  descriptions) gives them meaning.
+  numbers out of the prompt into numeric slots (2-3). A prompt number has no range of its
+  own: it is interpreted per candidate tool, against that tool's declared range, in the
+  relation step. Per tool and prompt number: in range?, level within the range, distance to
+  the candidate's value (fraction of the range), exact match. "set it to 2" then points at
+  the fan (0..3) and away from the thermostat (60..85) with no device named. Units: "50
+  percent" / "half" are levels (0.5 of any range); bare numbers and "degrees" are raw values.
+  Number words from speech ("seventy two") are converted to digits first.
 - Is 8 bytes enough for names? (We think yes, now that values travel separately.)
 - How much does the prompt encoder need to see word order vs. just which words appear?
 

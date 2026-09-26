@@ -75,6 +75,7 @@ flowchart LR
 | value encoder V | (value, lo, hi) → normalized 0..1 → 16 piecewise-linear bins + signed log magnitude + has-value = 18 features | every query |
 | fuse F | [name vector 64 ⊕ value features 18] → 128 → 64: value-aware item tokens ("thermostat, set low") | every query |
 | relation step | each tool attends over state name vectors, takes the matching field's value, Δ = tool value − state value → bins → added to the tool token | every query |
+| prompt numbers | numbers extracted from the prompt (2-3 slots, with a unit hint: raw or percent) are compared with each tool in that tool's own range: in range?, level, distance to the candidate value, exact match → added to the tool token | every query |
 | mixer | 21 tokens × 64 (8 state + 4 prompt + 8 tool + nothing); 2 blocks of 4-head attention + FFN 64→256→64, or 1 block applied 3 times | every query |
 | scorer | 64 → 1 per tool token and the nothing token; masked softmax over filled slots | every query |
 
