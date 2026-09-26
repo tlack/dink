@@ -260,3 +260,40 @@ Readings:
   (long names) now flips back to lights on. It had been right in all_worlds, so this one case
   is unstable between runs.
 - test_llm dips 0.014. That's within seed noise; watch it.
+
+## 2026-09-26: end-value decoy fix
+
+Found by hand-testing: "close the entrance gate" with {0, 0.16} offered picked 0.16. In the
+world data, an end value (lo or hi) of a non-switch setting was the right answer 5% of the
+time vs 12% for middle values. The cause: lo and hi were always added as decoys, and
+overshooting decoys were clamped onto the ends. Fix in `dink/gen/worlds.py`:
+- ends are added as decoys 30% of the time;
+- when the target is an end, a near-end decoy is offered;
+- out-of-range decoys are dropped instead of clamped.
+Balance after: ends right 12.8%, middle 10.7%.
+
+`all_v7`: same settings as all_inv (20k steps), split_v7, which is the same data
+reconverted. 143 thermal pauses, 79 minutes paused (the fan was probably not at max).
+Both models are scored on split_v7's test sets.
+
+| set | all_inv | all_v7 |
+|---|---|---|
+| test_areas | 0.908 | 0.914 |
+| test_worlds | 0.924 | **0.948** |
+| test_templates | 0.906 | 0.916 |
+| test_words | 0.884 | 0.864 |
+| test_llm | 0.836 | 0.808 |
+| test_styles | 0.940 | 0.920 |
+| test_mixed | 0.844 | 0.824 |
+| hard cases (32, incl. 4 range-end cases) | 28/32 | 28/32 |
+
+Readings:
+- The gate is fixed: all 4 range-end cases pass, and "make it really dark" passes in both
+  name styles.
+- The smart-home language sets slip 2-3 points (llm, words, styles, mixed), in the same
+  direction on all four. This may be seed noise (±0.03), or the world data crowding the
+  smart home. It needs a second seed to tell.
+- The intensity cases are unstable between runs. all_v7 sends "i want it hot as hell" to
+  *cooler* (67) and "make it super bright" to goodnight / off; all_inv got the direction
+  right. The model has no stable reading of intensifiers outside the generator's list
+  ("as hell", "super", "really").
