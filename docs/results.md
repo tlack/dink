@@ -133,3 +133,42 @@ Readings:
   training while "toastier" is held out, so test_words and test_templates now measure
   "this exact wording never seen" more than "this idea never seen".
 - The bank has some label noise, e.g. "why is the front door unlocked?" filed as *lock it*.
+
+## 2026-09-26: descriptive names; LLM-invented worlds
+
+**Descriptive names** (`big_names`, split_v3: nine naming styles, `camel` held out). This run
+survived a laptop crash through `--resume`; `train.py` now pauses at 80C.
+Language results match big_llm (test_llm 0.872 vs 0.894, words 0.830 vs 0.840). The unseen
+long style is handled: test_styles 0.966.
+
+**Worlds** (`dink/llm/worlds.py`): DeepSeek V4.1 Flash on Parasail, reasoning off, strict
+JSON schemas.
+- Collected 1,000 settings in 50 areas, 68,765 utterances, for $2.92.
+- Two independent labelings agree on 96.7% of requests.
+
+`dink/gen/worlds.py` validates in code and keeps 96%. Dropped: the two labelings disagree
+(1,791), same words with two labels, number mismatches, "a bit" moving over 20%, on/off
+actions against their words, and flips moving against plain direction words.
+
+250 worlds became 32k scenarios (2 variants each). Split v4 adds two holdouts: 5 whole areas
+(test_areas) and 10% of the worlds in the other areas (test_worlds). 18k world scenarios
+went into training alongside the smart home.
+
+| set | big_names (no worlds) | big_worlds |
+|---|---|---|
+| test_worlds (unseen settings, known areas) | 0.442 | **0.848** |
+| test_areas (5 unseen areas) | 0.436 | **0.776** |
+| smart home old:test_words | 0.830 | 0.846 |
+| smart home old:test_templates | 0.918 | 0.944 |
+| smart home old:test_llm | 0.872 | 0.832 |
+| hard cases | 20/28 | 20/28 |
+
+Readings:
+- 250 worlds nearly double accuracy on unseen settings. The smart-home sets hold, and
+  test_llm drops a little.
+- Accuracy on unseen areas by request kind: numbers 1.00, questions 0.98, unrelated 0.96,
+  "a bit" 0.76, "a lot" 0.65, direct 0.68, slang 0.67, desire 0.64, complaint 0.50.
+- Complaint errors: 21% abstain (a complaint doesn't name the device), 20% right tool but
+  wrong value, 11% wrong tool (world knowledge: "the image is too dark" -> exposure).
+- The framing hard cases haven't moved. The world data's desire / complaint examples don't
+  yet carry over to the smart home's "make it dark".
