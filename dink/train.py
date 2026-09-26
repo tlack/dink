@@ -69,6 +69,8 @@ def main():
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--lr", type=float, default=2e-3)
     ap.add_argument("--pre-lr", type=float, default=0.3, help="lr multiplier for distilled T and F")
+    ap.add_argument("--freeze", action="store_true",
+                    help="keep distilled T and F fixed (the prompt's pooling queries still train)")
     ap.add_argument("--eval-every", type=int, default=500)
     ap.add_argument("--name", default=None)
     ap.add_argument("--threads", type=int, default=11)
@@ -87,12 +89,19 @@ def main():
     model = Dink(width=a.width)
     if a.init == "distilled":
         model.load_distilled(a.ckpt)
-    pre = list(model.text.parameters()) + list(model.fuse.parameters())
+    pre = [p for p in list(model.text.parameters()) + list(model.fuse.parameters()) if p is not model.text.query]
     pre_ids = {id(p) for p in pre}
     rest = [p for p in model.parameters() if id(p) not in pre_ids]
-    mult = a.pre_lr if a.init == "distilled" else 1.0
-    opt = torch.optim.AdamW([{"params": pre, "lr": a.lr * mult}, {"params": rest, "lr": a.lr}], weight_decay=0.01)
-    sched = torch.optim.lr_scheduler.OneCycleLR(opt, [a.lr * mult, a.lr], total_steps=a.steps, pct_start=0.05)
+    if a.freeze:
+        for p in pre:
+            p.requires_grad_(False)
+        opt = torch.optim.AdamW(rest, lr=a.lr, weight_decay=0.01)
+        sched = torch.optim.lr_scheduler.OneCycleLR(opt, a.lr, total_steps=a.steps, pct_start=0.05)
+    else:
+        mult = a.pre_lr if a.init == "distilled" else 1.0
+        opt = torch.optim.AdamW([{"params": pre, "lr": a.lr * mult}, {"params": rest, "lr": a.lr}],
+                                weight_decay=0.01)
+        sched = torch.optim.lr_scheduler.OneCycleLR(opt, [a.lr * mult, a.lr], total_steps=a.steps, pct_start=0.05)
     n_params = sum(p.numel() for p in model.parameters())
     name = a.name or f"dink_{a.init}"
     out = Path("runs/dink") / name

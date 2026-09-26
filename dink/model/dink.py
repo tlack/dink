@@ -20,14 +20,20 @@ from .text import TextEncoder
 SLOTS = 8
 N_NUM = 3
 PROMPT_TOKENS = 4
-REL_BINS = 16
+# Bin edges for a tool's move relative to its state field, as a fraction of the range. Dense
+# near zero: "a bit warmer" on a 60..85 thermostat is 0.04, the default step 0.12, "a lot" 0.24,
+# and uniform bins (0.125 wide) could not tell the first two apart.
+_HALF = [0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.45, 0.65, 1.0]
+REL_EDGES = [-e for e in reversed(_HALF)] + [0.0] + _HALF
+REL_BINS = len(REL_EDGES) - 1
 
 
-def ple_signed(x, bins=REL_BINS):
-    """Piecewise-linear encoding of x in [-1, 1] (as (x + 1) / 2 in [0, 1])."""
-    level = ((x + 1) / 2).clamp(0, 1)
-    edges = torch.arange(bins, dtype=x.dtype, device=x.device) / bins
-    return ((level[..., None] - edges) * bins).clamp(0, 1)
+def ple_signed(x, edges=REL_EDGES):
+    """Piecewise-linear encoding of x in [-1, 1] over the given edges: bin i is 0 below its
+    interval, 1 above it, linear inside."""
+    e = torch.tensor(edges, dtype=x.dtype, device=x.device)
+    lo, width = e[:-1], e[1:] - e[:-1]
+    return ((x[..., None] - lo) / width).clamp(0, 1)
 
 
 class Dink(nn.Module):
