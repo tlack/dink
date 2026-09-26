@@ -2,6 +2,11 @@
 
   uv run python -u -m dink.train --init distilled --ckpt runs/text/tv128/model.pt --name d_distilled
   uv run python -u -m dink.train --init scratch --name d_scratch
+  uv run python -u -m dink.train --split data/home/split_v2 --batch 512 --steps 20000 --name big   # GPU
+
+On a GPU, background workers augment and collate batches (the Python side is the
+bottleneck). A resumable checkpoint is written every --ckpt-every steps (--resume picks it
+up); the log line shows the GPU temperature, since long runs have overheated this laptop.
 
 Each step draws base examples and augments them afresh (dink/gen/augment.py). Loss: cross
 entropy against the (possibly split) target distribution over 8 tools + nothing relevant.
@@ -10,6 +15,7 @@ import argparse
 import collections
 import json
 import random
+import subprocess
 import time
 from pathlib import Path
 
@@ -30,6 +36,32 @@ def is_nothing(s):
     return s.label == len(s.tools)
 
 
+class Batches(torch.utils.data.IterableDataset):
+    """Endless augmented, collated batches; each worker has its own random stream."""
+
+    def __init__(self, train, batch, seed):
+        self.train, self.batch, self.seed = train, batch, seed
+
+    def __iter__(self):
+        info = torch.utils.data.get_worker_info()
+        rng = random.Random(self.seed * 1000 + (info.id if info else 0))
+        while True:
+            yield collate([A.augment(rng.choice(self.train), rng) for _ in range(self.batch)])
+
+
+def to(x, dev):
+    return {k: v.to(dev, non_blocking=True) for k, v in x.items()}
+
+
+def gpu_temp():
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+        return f"  gpu {out}C" if out else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 @torch.no_grad()
 def evaluate(model, items, batch=256):
     """Accuracy (a pick is right if it is one of the best answers), nothing-relevant
@@ -41,7 +73,7 @@ def evaluate(model, items, batch=256):
     for i in range(0, len(items), batch):
         chunk = items[i:i + batch]
         x = collate(chunk)
-        prob = model(x).softmax(-1)
+        prob = model(to(x, next(model.parameters()).device)).softmax(-1).cpu()
         pred = prob.argmax(-1)
         for s, p, pr, t in zip(chunk, pred.tolist(), prob, x["target"]):
             right = bool(t[p] >= t.max() - 1e-6)
@@ -75,10 +107,13 @@ def main():
     ap.add_argument("--name", default=None)
     ap.add_argument("--threads", type=int, default=11)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    ap.add_argument("--workers", type=int, default=4, help="batch-building processes (0 = in the main process)")
+    ap.add_argument("--ckpt-every", type=int, default=1000)
+    ap.add_argument("--resume", action="store_true", help="continue from runs/dink/<name>/ckpt.pt")
     a = ap.parse_args()
     torch.set_num_threads(a.threads)
     torch.manual_seed(a.seed)
-    rng = random.Random(a.seed)
     split = Path(a.split)
     train, val = load(split / "train.jsonl"), load(split / "val.jsonl")
     tests = {p.stem: load(p) for p in sorted(split.glob("test_*.jsonl"))}
@@ -89,6 +124,7 @@ def main():
     model = Dink(width=a.width)
     if a.init == "distilled":
         model.load_distilled(a.ckpt)
+    model.to(a.device)
     pre = [p for p in list(model.text.parameters()) + list(model.fuse.parameters()) if p is not model.text.query]
     pre_ids = {id(p) for p in pre}
     rest = [p for p in model.parameters() if id(p) not in pre_ids]
@@ -107,12 +143,21 @@ def main():
     out = Path("runs/dink") / name
     out.mkdir(parents=True, exist_ok=True)
     print(f"{name}: {n_params / 1e3:.0f}K parameters, init {a.init}, {len(train)} train / {len(val)} val", flush=True)
-    history = []
+    history, start = [], 1
+    if a.resume and (out / "ckpt.pt").exists():
+        ck = torch.load(out / "ckpt.pt", weights_only=False)
+        model.load_state_dict(ck["state"])
+        opt.load_state_dict(ck["opt"])
+        sched.load_state_dict(ck["sched"])
+        history, start = ck["history"], ck["step"] + 1
+        print(f"resumed at step {start}", flush=True)
+    loader = iter(torch.utils.data.DataLoader(Batches(train, a.batch, a.seed + start), batch_size=None,
+                                              num_workers=a.workers, pin_memory=a.device != "cpu",
+                                              persistent_workers=a.workers > 0))
     t0 = time.time()
-    for step in range(1, a.steps + 1):
+    for step in range(start, a.steps + 1):
         model.train()
-        batch = [A.augment(rng.choice(train), rng) for _ in range(a.batch)]
-        x = collate(batch)
+        x = to(next(loader), a.device)
         logp = F.log_softmax(model(x), -1)
         loss = -(x["target"] * logp).sum(-1).mean()
         opt.zero_grad()
@@ -124,8 +169,11 @@ def main():
             v = evaluate(model, val)
             history.append({"step": step, "loss": loss.item(), "val_acc": v["acc"]})
             print(f"step {step:5d}  loss {loss.item():.3f}  val acc {v['acc']:.3f}  "
-                  f"nothing P/R {v['nothing_precision']:.2f}/{v['nothing_recall']:.2f}  ({time.time() - t0:.0f}s)",
-                  flush=True)
+                  f"nothing P/R {v['nothing_precision']:.2f}/{v['nothing_recall']:.2f}  ({time.time() - t0:.0f}s)"
+                  + gpu_temp(), flush=True)
+        if a.ckpt_every and step % a.ckpt_every == 0:
+            torch.save({"state": model.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
+                        "history": history, "step": step, "args": vars(a)}, out / "ckpt.pt")
     torch.save({"state": model.state_dict(), "args": vars(a)}, out / "model.pt")
     results = {"val": evaluate(model, val)}
     for k, items in tests.items():
