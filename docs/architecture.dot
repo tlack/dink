@@ -1,0 +1,80 @@
+// Dink network, v2 (2026-09-26). Rendered by docs/render_architecture.py.
+// Colors are placeholders (#0000xx) that the renderer maps to theme colors:
+//   01 ink  02 muted  03 query  04 cached  05 train  06 panel  07 query fill  08 cached fill
+//   09 train fill  0a rule  0b output fill
+digraph dink {
+  graph [rankdir=TB, bgcolor="transparent", fontname="Helvetica", fontsize=13, fontcolor="#000001",
+         nodesep=0.35, ranksep=0.42, pad=0.2, newrank=true, compound=true];
+  node  [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=12, fontcolor="#000001",
+         color="#000003", fillcolor="#000007", penwidth=1.6, margin="0.14,0.07"];
+  edge  [color="#000002", penwidth=1.2, arrowsize=0.7, fontname="Helvetica", fontsize=10, fontcolor="#000002"];
+
+  subgraph cluster_setup {
+    label=<<b>once per device setup</b> · cached>; labeljust=l; style="rounded,dashed"; color="#000004";
+    fontcolor="#000004"; penwidth=1.4;
+    node [color="#000004", fillcolor="#000008"];
+    names  [label=<<b>state + tool names</b><br/><font point-size="10">16 × up to 40 bytes<br/>kitchen_thermostat · set_kitchen_light</font>>];
+    tn     [label=<<b>text encoder T</b><br/><font point-size="10">shared weights · pooling query 0</font>>];
+    nvec   [label=<<b>name vectors</b><br/><font point-size="10">16 × 64</font>>];
+    names -> tn -> nvec;
+  }
+
+  subgraph cluster_query {
+    label=<<b>every query</b>>; labeljust=l; style="rounded"; color="#000003"; fontcolor="#000003"; penwidth=1.4;
+
+    prompt [label=<<b>prompt</b><br/><font point-size="10">64 bytes · "it's a bit chilly in here"</font>>];
+    vals   [label=<<b>current values</b><br/><font point-size="10">8 state + 8 tool slots<br/>(value, lo, hi)</font>>];
+
+    tp     [label=<<b>text encoder T</b><br/><font point-size="10">same weights · 4 pooling queries</font>>];
+    nums   [label=<<b>number extractor</b><br/><font point-size="10">up to 3 numbers, words too<br/>raw (72) or level (50 %)</font>>, fillcolor="#000006"];
+    vfeat  [label=<<b>value features V</b><br/><font point-size="10">(value − lo) / (hi − lo)<br/>16 bins + log magnitude + has-value</font>>];
+
+    fuse   [label=<<b>fuse F</b><br/><font point-size="10">MLP [name 64 ⊕ values 18] → 128 → 64<br/>+ role embedding</font>>];
+    ptok   [label=<<b>prompt tokens</b><br/><font point-size="10">4 × 64</font>>];
+    stok   [label=<<b>state tokens</b><br/><font point-size="10">8 × 64</font>>];
+    ttok   [label=<<b>tool tokens</b><br/><font point-size="10">8 × 64</font>>];
+
+    rel    [label=<<b>relation step</b><br/><font point-size="10">each tool's name attends over state names<br/>Δ = tool level − matched field's level<br/>18 bins (dense near 0) + |Δ| + match strength</font>>];
+    pnum   [label=<<b>prompt numbers, per tool</b><br/><font point-size="10">read in the tool's own range:<br/>present · in range · level · distance · exact</font>>];
+    none   [label=<<b>nothing-relevant token</b><br/><font point-size="10">learned · 1 × 64</font>>];
+
+    mixer  [label=<<b>mixer</b><br/><font point-size="10">21 tokens × 64: 8 state + 4 prompt + 8 tool + 1 nothing<br/>2 pre-norm blocks · 4-head attention · FFN 64 → 256 → 64<br/>empty slots masked</font>>, penwidth=2.2];
+    score  [label=<<b>scorer</b><br/><font point-size="10">LayerNorm · 64 → 1 on 8 tool tokens + nothing</font>>];
+    out    [label=<<b>9 probabilities</b><br/><font point-size="10">one per tool, plus "nothing relevant"<br/>(empty slots masked)</font>>, fillcolor="#00000b", penwidth=2.2];
+
+    plus   [label=<<b>⊕</b>>, shape=circle, fixedsize=true, width=0.42, fontsize=16, fillcolor="#000006"];
+    ttok2  [label=<<b>tool tokens, final</b><br/><font point-size="10">8 × 64: name + value + Δ + numbers</font>>];
+
+    prompt -> tp -> ptok;
+    prompt -> nums;
+    vals -> vfeat -> fuse;
+    vals -> rel  [label=" levels", penwidth=0.9];
+    vals -> pnum [label=" tool lo, hi, level", penwidth=0.9];
+    fuse -> stok;
+    fuse -> ttok;
+    nums -> pnum;
+    ttok -> plus;
+    rel  -> plus [label=" Δ features"];
+    pnum -> plus [label=" number features"];
+    plus -> ttok2;
+    ptok  -> mixer;
+    stok  -> mixer;
+    ttok2 -> mixer;
+    none  -> mixer;
+    mixer -> score -> out;
+
+    {rank=same; prompt; vals}
+    {rank=same; tp; nums; vfeat}
+    {rank=same; stok; ttok; rel; pnum}
+  }
+
+  nvec -> fuse [label=" cached name vectors", color="#000004", fontcolor="#000004"];
+  nvec -> rel  [color="#000004", label=" which state field\n goes with each tool", fontcolor="#000004"];
+
+  subgraph cluster_train {
+    label=<<b>training only</b>>; labeljust=l; style="rounded,dashed"; color="#000005"; fontcolor="#000005";
+    node [color="#000005", fillcolor="#000009", style="rounded,filled,dashed"];
+    teacher [label=<<b>teacher: Qwen3-Embedding-0.6B</b><br/><font point-size="10">frozen · vectors reduced to 64 (PCA)</font>>];
+  }
+  teacher -> tn [style=dashed, color="#000005", fontcolor="#000005", label=" distill T and F\n (cosine + similarity)"];
+}
