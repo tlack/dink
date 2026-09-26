@@ -19,11 +19,20 @@ def main():
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
     ck = torch.load(Path(a.run) / "model.pt", weights_only=False, map_location=a.device)
-    model = Dink(width=ck["args"]["width"]).to(a.device)
+    model = Dink(width=ck["args"]["width"], scenario=ck["args"].get("scenario", False)).to(a.device)
     model.load_state_dict(ck["state"])
     print(f"{'set':16s} {'acc':>6s} {'p(right)':>9s} {'nothing P/R':>12s}")
+    fill = None
+    if model.use_scenario:
+        import random
+        from .gen.scenario_text import ScenarioText
+        st, rng = ScenarioText(), random.Random(7)
+        fill = lambda items: [st.fill(s, rng) for s in items]
     for p in sorted(Path(a.split).glob(a.sets + ".jsonl")):
-        r = evaluate(model, load(p))
+        items = load(p)
+        if fill:
+            fill(items)
+        r = evaluate(model, items)
         print(f"{p.stem:16s} {r['acc']:6.3f} {r['p_right']:9.3f} {r['nothing_precision']:6.2f}/{r['nothing_recall']:.2f}")
 
 

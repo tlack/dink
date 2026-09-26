@@ -13,6 +13,7 @@ entropy against the (possibly split) target distribution over 8 tools + nothing 
 """
 import argparse
 import collections
+import dataclasses
 import json
 import random
 import subprocess
@@ -39,14 +40,20 @@ def is_nothing(s):
 class Batches(torch.utils.data.IterableDataset):
     """Endless augmented, collated batches; each worker has its own random stream."""
 
-    def __init__(self, train, batch, seed):
-        self.train, self.batch, self.seed = train, batch, seed
+    def __init__(self, train, batch, seed, scenario_drop=0.0):
+        self.train, self.batch, self.seed, self.scenario_drop = train, batch, seed, scenario_drop
+
+    def draw(self, rng):
+        s = A.augment(rng.choice(self.train), rng)
+        if s.scenario and rng.random() < self.scenario_drop:     # the model must work without one too
+            s = dataclasses.replace(s, scenario="")
+        return s
 
     def __iter__(self):
         info = torch.utils.data.get_worker_info()
         rng = random.Random(self.seed * 1000 + (info.id if info else 0))
         while True:
-            yield collate([A.augment(rng.choice(self.train), rng) for _ in range(self.batch)])
+            yield collate([self.draw(rng) for _ in range(self.batch)])
 
 
 def to(x, dev):
@@ -130,6 +137,9 @@ def main():
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--workers", type=int, default=4, help="batch-building processes (0 = in the main process)")
     ap.add_argument("--ckpt-every", type=int, default=1000)
+    ap.add_argument("--scenario", action="store_true",
+                    help="give the model each gadget's scenario description (dink/gen/scenario_text.py)")
+    ap.add_argument("--scenario-drop", type=float, default=0.3, help="share of training draws without it")
     ap.add_argument("--also", default=None,
                     help="another split (same holdouts) whose test sets are scored too, as old:<set>")
     ap.add_argument("--resume", action="store_true", help="continue from runs/dink/<name>/ckpt.pt")
@@ -148,8 +158,14 @@ def main():
     tests["hard"] = cases()
     if a.also:
         tests |= {"old:" + p.stem: load(p) for p in sorted(Path(a.also).glob("test_*.jsonl"))}
+    if a.scenario:
+        from .gen.scenario_text import ScenarioText
+        st, srng = ScenarioText(), random.Random(7)
+        for items in [train, val] + list(tests.values()):
+            for s in items:
+                st.fill(s, srng)
 
-    model = Dink(width=a.width)
+    model = Dink(width=a.width, scenario=a.scenario)
     if a.init == "distilled":
         model.load_distilled(a.ckpt)
     model.to(a.device)
@@ -179,7 +195,8 @@ def main():
         sched.load_state_dict(ck["sched"])
         history, start = ck["history"], ck["step"] + 1
         print(f"resumed at step {start}", flush=True)
-    loader = iter(torch.utils.data.DataLoader(Batches(train, a.batch, a.seed + start), batch_size=None,
+    loader = iter(torch.utils.data.DataLoader(Batches(train, a.batch, a.seed + start,
+                                                                      a.scenario_drop if a.scenario else 0.0), batch_size=None,
                                               num_workers=a.workers, pin_memory=a.device != "cpu",
                                               persistent_workers=a.workers > 0))
     t0 = time.time()

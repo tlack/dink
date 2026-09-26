@@ -81,7 +81,7 @@ def fmt(f):
 
 def load_model(run, device):
     ck = torch.load(Path(run) / "model.pt", weights_only=False, map_location=device)
-    m = Dink(width=ck["args"]["width"]).to(device)
+    m = Dink(width=ck["args"]["width"], scenario=ck["args"].get("scenario", False)).to(device)
     m.load_state_dict(ck["state"])
     return m.eval()
 

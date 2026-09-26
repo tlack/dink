@@ -10,6 +10,7 @@ import json
 
 NAME_BYTES = 40     # state field and tool names (dink/gen/names.py: up to 35 in the smart home)
 PROMPT_BYTES = 64
+SCENARIO_BYTES = 128  # the gadget's scenario description (optional, encoded once per device)
 MAX_SLOTS = 8       # state fields, and separately tools
 
 
@@ -36,6 +37,7 @@ class Scenario:
     tools: list          # [Field]
     target: list         # len(tools) + 1 probabilities; last = "nothing relevant"
     meta: dict = field(default_factory=dict)
+    scenario: str = ""   # what the gadget is and who uses it, e.g. "Homebrew fermentation chamber. ..."
 
     @property
     def label(self) -> int:
@@ -48,6 +50,7 @@ class Scenario:
             assert 0 < len(f.name.encode()) <= NAME_BYTES, f.name
             assert f.lo <= f.value <= f.hi or not f.arg, (f.name, f.value, f.lo, f.hi)
         assert len(self.prompt.encode()) <= PROMPT_BYTES, self.prompt
+        assert len(self.scenario.encode()) <= SCENARIO_BYTES, self.scenario
         assert len(self.target) == len(self.tools) + 1
         assert abs(sum(self.target) - 1) < 1e-6 and min(self.target) >= 0
         names = [f.name for f in self.state]
@@ -61,7 +64,7 @@ class Scenario:
     def from_json(line: str) -> "Scenario":
         d = json.loads(line)
         return Scenario([Field(**f) for f in d["state"]], d["prompt"],
-                        [Field(**f) for f in d["tools"]], d["target"], d.get("meta", {}))
+                        [Field(**f) for f in d["tools"]], d["target"], d.get("meta", {}), d.get("scenario", ""))
 
     def show(self) -> str:
         """Human-readable rendering, for eyeballing generated data."""

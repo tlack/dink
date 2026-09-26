@@ -7,7 +7,10 @@ See docs/architecture.md for the diagram.
                    the difference between its value and that field's, as features
   prompt numbers   numbers pulled from the prompt, compared with each tool in the tool's
                    own range: in range?, level, distance to the candidate value, exact match
+  scenario         optional: the gadget's description ("Homebrew fermentation chamber. ..."),
+                   encoded once per device by the same T; 2 tokens the mixer can attend to
   mixer            2 pre-norm attention blocks over 8 state + 4 prompt + 8 tool + 1 nothing
+                   (+ 2 scenario tokens when enabled)
   scorer           one logit per tool token and for the nothing token; empty slots masked
 """
 import torch
@@ -20,6 +23,8 @@ from .text import TextEncoder
 SLOTS = 8
 N_NUM = 3
 PROMPT_TOKENS = 4
+SCENARIO_TOKENS = 2
+SCENARIO_BYTES = 128
 # Bin edges for a tool's move relative to its state field, as a fraction of the range. Dense
 # near zero: "a bit warmer" on a 60..85 thermostat is 0.04, the default step 0.12, "a lot" 0.24,
 # and uniform bins (0.125 wide) could not tell the first two apart.
@@ -37,9 +42,13 @@ def ple_signed(x, edges=REL_EDGES):
 
 
 class Dink(nn.Module):
-    def __init__(self, width=128, dim=64, blocks=2, heads=4, ff=256, dropout=0.1):
+    def __init__(self, width=128, dim=64, blocks=2, heads=4, ff=256, dropout=0.1, scenario=False):
         super().__init__()
-        self.text = TextEncoder(width=width, out=dim, queries=PROMPT_TOKENS)
+        self.use_scenario = scenario
+        self.text = TextEncoder(width=width, out=dim, queries=PROMPT_TOKENS,
+                                max_len=SCENARIO_BYTES if scenario else 64)
+        if scenario:
+            self.scenario_role = nn.Parameter(torch.randn(dim) * 0.02)
         self.fuse = Fuse(dim=dim)
         self.role = nn.Embedding(3, dim)                       # state, prompt, tool
         self.nothing = nn.Parameter(torch.randn(dim) * 0.02)
@@ -58,6 +67,9 @@ class Dink(nn.Module):
         ck = torch.load(path, weights_only=False)
         st = dict(ck["text"])
         q = st.pop("query")
+        pos = self.text.pos.detach().clone()                   # the scenario needs 128 positions
+        pos[: st["pos"].shape[0]] = st["pos"]
+        st["pos"] = pos
         missing = self.text.load_state_dict(st, strict=False)
         assert set(missing.missing_keys) == {"query"}, missing
         with torch.no_grad():
@@ -100,10 +112,14 @@ class Dink(nn.Module):
 
         prompt = self.text(x["prompt"]) + self.role.weight[2]                     # [B, 4, dim]
         B = prompt.shape[0]
-        tokens = torch.cat([state, prompt, tool, self.nothing.expand(B, 1, -1)], 1)
-        pad = torch.cat([~x["state_mask"], torch.zeros(B, PROMPT_TOKENS, dtype=torch.bool, device=prompt.device),
-                         ~x["tool_mask"], torch.zeros(B, 1, dtype=torch.bool, device=prompt.device)], 1)
-        h = self.norm(self.mixer(tokens, src_key_padding_mask=pad))
-        logits = self.score(h[:, SLOTS + PROMPT_TOKENS:]).squeeze(-1)             # [B, 9]: 8 tools + nothing
+        tokens = [state, prompt, tool, self.nothing.expand(B, 1, -1)]
+        pad = [~x["state_mask"], torch.zeros(B, PROMPT_TOKENS, dtype=torch.bool, device=prompt.device),
+               ~x["tool_mask"], torch.zeros(B, 1, dtype=torch.bool, device=prompt.device)]
+        if self.use_scenario:                   # 2 tokens after the rest; masked when there is no scenario
+            tokens.append(self.text(x["scenario"])[:, :SCENARIO_TOKENS] + self.scenario_role)
+            pad.append((~x["scenario_mask"])[:, None].expand(B, SCENARIO_TOKENS))
+        h = self.norm(self.mixer(torch.cat(tokens, 1), src_key_padding_mask=torch.cat(pad, 1)))
+        first = SLOTS + PROMPT_TOKENS
+        logits = self.score(h[:, first:first + SLOTS + 1]).squeeze(-1)           # [B, 9]: 8 tools + nothing
         mask = torch.cat([x["tool_mask"], torch.ones(B, 1, dtype=torch.bool, device=prompt.device)], 1)
         return logits.masked_fill(~mask, -1e4)

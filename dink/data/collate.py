@@ -1,7 +1,7 @@
 """Scenarios -> the tensors dink.model.dink.Dink takes."""
 import torch
 
-from ..model.dink import N_NUM, SLOTS
+from ..model.dink import N_NUM, SCENARIO_BYTES, SLOTS
 from ..model.text import to_bytes
 from .numbers import extract
 
@@ -40,4 +40,6 @@ def collate(scenarios, name_len=NAME_LEN):
         x["target"][i, SLOTS] = s.target[n]
         prompts.append(s.prompt)
     x["prompt"] = to_bytes(prompts)
+    x["scenario"] = to_bytes([s.scenario for s in scenarios], SCENARIO_BYTES)
+    x["scenario_mask"] = torch.tensor([bool(s.scenario) for s in scenarios])
     return x
