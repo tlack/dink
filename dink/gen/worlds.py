@@ -99,7 +99,7 @@ def problems(world, u, parent=None):
     a = acts.get(u["action"])
     if u["action"] != "none" and a is None:
         return ["unknown action"]
-    if u["source"] in ("request", "same") and not u.get("agree"):
+    if u["source"] in ("request", "same", "invert") and not u.get("agree"):
         out.append("replay disagrees")
     if a is not None and a["lo"] is not None and u["kind"] in ("number", "direct"):
         said = [v for v, k in extract(u["say"]) if k == "raw" and a["lo"] <= v <= a["hi"]]
@@ -267,6 +267,8 @@ def scenario(world, u, rng, style):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=str(SRC))
+    ap.add_argument("--extra", default=None, help="inverted utterances to merge in (dink/llm/invert.py output)")
+    ap.add_argument("--sources", default=None, help="convert only these sources, e.g. 'invert'")
     ap.add_argument("--validate", action="store_true", help="report only")
     ap.add_argument("--worlds", type=int, default=250, help="how many worlds to convert (a seeded sample)")
     ap.add_argument("--variants", type=int, default=2, help="scenarios per utterance (different tools, styles)")
@@ -274,6 +276,13 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
     worlds = load(a.src)
+    if a.extra:                                  # inverted variants join their world's utterances
+        extra = {}
+        for line in Path(a.extra).read_text().splitlines():
+            r = json.loads(line)
+            extra.setdefault(r["setting"], []).extend(r["utterances"])
+        for w in worlds:
+            w["utterances"] = w["utterances"] + extra.get(w["setting"], [])
     for w in worlds:
         mark_int(w)
     rng = random.Random(a.seed)
@@ -286,6 +295,8 @@ def main():
         print(f"  drop: {k:36s} {v}")
     if a.validate:
         return
+    if a.sources:
+        keep = [k for k in keep if k[1]["source"] in a.sources.split(",")]
     out, bad = [], 0
     for w, u, _ in keep:
         for _ in range(a.variants):
