@@ -53,13 +53,33 @@ def to(x, dev):
     return {k: v.to(dev, non_blocking=True) for k, v in x.items()}
 
 
-def gpu_temp():
+def gpu_celsius():
+    """GPU temperature, or None without nvidia-smi."""
     try:
         out = subprocess.run(["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader"],
                              capture_output=True, text=True, timeout=5).stdout.strip()
-        return f"  gpu {out}C" if out else ""
-    except (OSError, subprocess.SubprocessError):
-        return ""
+        return int(out.splitlines()[0]) if out else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def gpu_temp():
+    c = gpu_celsius()
+    return f"  gpu {c}C" if c is not None else ""
+
+
+def cool_down(hot, cool):
+    """This laptop's fan sometimes doesn't spin up, and hot runs have crashed it twice:
+    above `hot` C, pause training until the GPU is back under `cool` C."""
+    c = gpu_celsius()
+    if c is None or c < hot:
+        return
+    t0 = time.time()
+    print(f"  gpu {c}C >= {hot}C: pausing until {cool}C", flush=True)
+    while c is not None and c > cool:
+        time.sleep(5)
+        c = gpu_celsius()
+    print(f"  resumed after {time.time() - t0:.0f}s at {c}C", flush=True)
 
 
 @torch.no_grad()
@@ -113,6 +133,8 @@ def main():
     ap.add_argument("--also", default=None,
                     help="another split (same holdouts) whose test sets are scored too, as old:<set>")
     ap.add_argument("--resume", action="store_true", help="continue from runs/dink/<name>/ckpt.pt")
+    ap.add_argument("--gpu-hot", type=int, default=80, help="pause training at this GPU temperature (C)")
+    ap.add_argument("--gpu-cool", type=int, default=70, help="...until it is back under this one")
     a = ap.parse_args()
     torch.set_num_threads(a.threads)
     torch.manual_seed(a.seed)
@@ -162,6 +184,8 @@ def main():
                                               persistent_workers=a.workers > 0))
     t0 = time.time()
     for step in range(start, a.steps + 1):
+        if a.device != "cpu" and step % 25 == 0:
+            cool_down(a.gpu_hot, a.gpu_cool)
         model.train()
         x = to(next(loader), a.device)
         logp = F.log_softmax(model(x), -1)
