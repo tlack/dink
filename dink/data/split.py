@@ -17,11 +17,12 @@ import argparse
 import collections
 import json
 import random
+import zlib
 from pathlib import Path
 
 from .scenario import Scenario
 
-AXES = ["words", "templates", "rooms", "kinds", "styles", "units", "slots", "llm"]
+AXES = ["words", "templates", "rooms", "kinds", "styles", "units", "slots", "llm", "areas", "worlds"]
 
 
 def values(uses, axis):
@@ -32,6 +33,8 @@ def values(uses, axis):
         return {uses.get("style")}
     if axis == "units":
         return {uses.get("units")}
+    if axis == "areas":
+        return {uses.get("area")} - {None}
     return set()
 
 
@@ -43,7 +46,13 @@ def llm_held(phrase_id, fraction):
 def touches(uses, axis, held, slots):
     if axis == "llm":
         return any(llm_held(p, held["llm_fraction"]) for p in uses.get("llm", []))
+    if axis == "worlds":                # LLM-invented worlds (dink/gen/worlds.py) held out by name hash
+        w = uses.get("world")
+        return bool(w) and uses.get("area") not in held["areas"] and \
+            zlib.crc32(w.encode()) % 1000 < held["world_fraction"] * 1000
     if axis == "slots":
+        if uses.get("world"):          # the slot-count test is about the smart home; worlds use all 8
+            return False
         return uses.get("n_state", 0) > slots["max_state"] or uses.get("n_tools", 0) > slots["max_tools"]
     return bool(values(uses, axis) & held[axis])
 
@@ -51,7 +60,7 @@ def touches(uses, axis, held, slots):
 def choose_holdouts(records, cfg, rng):
     """Fixed lists from the config, plus sampled values. Words and templates used by more
     than 20% of records are never sampled: holding one out would starve training."""
-    held = {a: set(cfg.get(a, [])) for a in AXES if a not in ("slots", "llm")}
+    held = {a: set(cfg.get(a, [])) for a in AXES if a not in ("slots", "llm", "worlds")}
     counts = {a: collections.Counter() for a in held}
     for s in records:
         for a in held:
@@ -68,6 +77,7 @@ def split(records, cfg, seed=0, n_train=None):
     rng = random.Random(seed)
     held = choose_holdouts(records, cfg, rng)
     held["llm_fraction"] = cfg.get("llm_holdout", 0.0)
+    held["world_fraction"] = cfg.get("world_holdout", 0.0)
     slots = cfg.get("slots", {"max_state": 8, "max_tools": 8})
     sets = collections.defaultdict(list)
     clean = []
@@ -96,7 +106,7 @@ def split(records, cfg, seed=0, n_train=None):
     for name in ("train", "val"):
         for s in sets[name]:
             assert not any(touches(s.meta["uses"], a, held, slots) for a in AXES), name
-    return dict(sets), {a: sorted(v) for a, v in held.items() if a != "llm_fraction"}
+    return dict(sets), {a: sorted(v) for a, v in held.items() if not a.endswith("_fraction")}
 
 
 def main():
@@ -115,7 +125,8 @@ def main():
     for name, items in sorted(sets.items()):
         (out / f"{name}.jsonl").write_text("".join(s.to_json() + "\n" for s in items))
     manifest = {"pool": a.pool, "config": a.config, "seed": a.seed, "n_train_cap": a.n_train,
-                "held_out": held, "llm_holdout": cfg.get("llm_holdout", 0.0), "counts": {k: len(v) for k, v in sorted(sets.items())}}
+                "held_out": held, "llm_holdout": cfg.get("llm_holdout", 0.0),
+                "world_holdout": cfg.get("world_holdout", 0.0), "counts": {k: len(v) for k, v in sorted(sets.items())}}
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
     for k, v in sorted(sets.items()):
         print(f"  {k:14s} {len(v)}")
