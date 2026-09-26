@@ -8,6 +8,7 @@ import copy
 import random
 
 from ..data.scenario import PROMPT_BYTES, Scenario
+from .names import parse
 
 FILLERS = ["uh", "um", "ok", "hey", "so", "like", "yeah", "please", "alright"]
 ASR_SWAPS = {  # plausible speech-recognition confusions
@@ -44,7 +45,7 @@ def drop_state(s: Scenario, rng: random.Random, p: float = 0.3) -> Scenario:
     """Remove state fields the answer does not depend on (meta["needed"] and occupancy stay)."""
     s = _clone(s)
     keep = set(s.meta.get("needed", []))
-    s.state = [f for f in s.state if f.name in keep or f.name.startswith("occ_") or rng.random() > p]
+    s.state = [f for f in s.state if f.name in keep or parse(f.name)[1] == "occ" or rng.random() > p]
     return s
 
 

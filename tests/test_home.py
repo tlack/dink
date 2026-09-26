@@ -4,11 +4,12 @@ import random
 import numpy as np
 import pytest
 
-from dink.data.encode import batch
+from dink.data.collate import NAME_LEN, collate
 from dink.data.scenario import Scenario
 from dink.data.split import AXES, split, touches
 from dink.gen import augment as A
 from dink.gen.__main__ import generate
+from dink.gen import names as N
 from dink.gen.home import split_name
 
 CFG = json.load(open("configs/home_split.json"))
@@ -32,7 +33,7 @@ def test_relative_moves_the_right_way(pool):
                 and s.label < len(s.tools):
             t = s.tools[s.label]
             room, kind = split_name(t.name)
-            cur = {f.name: f.value for f in s.state}[f"{room}_{kind}"]
+            cur = {f.name: f.value for f in s.state}[N.state(s.meta["uses"]["style"], room, kind)]
             assert (t.value - cur) * s.meta["dir"] > 0, s.show()
             checked += 1
     assert checked > 500
@@ -87,9 +88,9 @@ def test_sampled_holdouts_are_reproducible(pool):
 def test_json_roundtrip_and_encode(pool):
     s = pool[0]
     assert Scenario.from_json(s.to_json()).to_json() == s.to_json()
-    b = batch(pool[:64])
-    assert b["prompt"].shape == (64, 64) and b["tool_name"].shape == (64, 8, 8)
-    assert np.allclose(b["target"].sum(1), 1)
+    b = collate(pool[:64])
+    assert b["prompt"].shape == (64, 64) and b["tool_name"].shape == (64, 8, NAME_LEN)
+    assert np.allclose(b["target"].sum(1).numpy(), 1)
 
 
 def test_bank_phrases_are_annotated_and_held_out():

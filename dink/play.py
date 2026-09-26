@@ -2,8 +2,9 @@
 
 One shot:
   uv run python -m dink.play \\
-      --state "bed_temp=70  bed_lite=0.3  out_tmp=95:-10..110" \\
-      --tools "set_bedt=71  set_bedt=73  set_bedt=76  set_bedl=0  set_bedl=1  goodnite" \\
+      --state "bedroom_thermostat=70  bedroom_light=0.3  outdoor_temperature=95:-10..110" \\
+      --tools "set_bedroom_thermostat=71  set_bedroom_thermostat=73  set_bedroom_thermostat=76 \\
+               set_bedroom_light=0  set_bedroom_light=1  goodnight" \\
       "it's a bit chilly in here"
 
 Interactive (keeps the house loaded; type prompts, or :help):
@@ -11,10 +12,11 @@ Interactive (keeps the house loaded; type prompts, or :help):
   uv run python -m dink.play -i --random          # start from a held-out test scenario
 
 Item syntax, space- or comma-separated:  name=value[:lo..hi]   or a bare name for a tool
-with no argument (a scene). Without a range, one is guessed from the name the way the
-smart-home generator names things: *_temp / temp_* / set_<room>t -> 60..85, lights and
-blinds 0..1, fans 0..3, *_lck / *door* 0..1. Rooms: lr kit bed ofc bth (den was held out).
-Names are read as bytes; the model saw names up to 8 bytes.
+with no argument (a scene). Names can't contain spaces here (use _). Without a range, one is
+guessed from words in the name: thermostat/temp/climate/heat -> 60..85, light/lamp and
+blinds/shades/cover -> 0..1, fan -> 0..3, lock/door -> 0..1. The generator's styles
+(dink/gen/names.py): bedroom_light, set_bedroom_light, light.bedroom, kit_lite, set_kitl ...
+Rooms: living room, kitchen, bedroom, office, bathroom (den was held out).
 """
 import argparse
 import random
@@ -26,7 +28,8 @@ import torch
 from .data.collate import collate
 from .data.numbers import extract
 from .data.scenario import Field, Scenario
-from .gen.home import KINDS, kind_of
+from .gen.home import KINDS
+from .gen.names import parse
 from .model.dink import SLOTS, Dink
 
 RANGES = {k: (v.lo, v.hi) for k, v in KINDS.items()}
@@ -38,12 +41,20 @@ HELP = """commands:
   :quit"""
 
 
+GUESS = [(("thermostat", "temp", "climate", "heat", "_t"), RANGES["temp"]), (("fan",), RANGES["fan"]),
+         (("light", "lamp", "lite", "blind", "shade", "curtain", "cover", "lock", "door", "lck"), (0.0, 1.0))]
+
+
 def guess_range(name):
-    k = kind_of(name)
-    if k:
+    _, k = parse(name)
+    if k in RANGES:
         return RANGES[k]
-    if "lck" in name or "lk" in name or "door" in name or "dr" in name:
+    if k in ("lock", "door", "occ"):
         return 0.0, 1.0
+    low = name.lower()
+    for words, rng in GUESS:
+        if any(w in low for w in words):
+            return rng
     raise ValueError(f"no range for {name!r}: write it as {name}=<value>:<lo>..<hi>")
 
 

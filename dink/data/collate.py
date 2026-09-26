@@ -5,7 +5,7 @@ from ..model.dink import N_NUM, SLOTS
 from ..model.text import to_bytes
 from .numbers import extract
 
-NAME_LEN = 16       # bytes per name the model reads (names are <= 8 bytes in the smart home)
+NAME_LEN = 40       # bytes per name the model reads (= scenario.NAME_BYTES)
 
 
 def collate(scenarios, name_len=NAME_LEN):

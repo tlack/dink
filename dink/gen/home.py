@@ -10,6 +10,7 @@ import random
 from dataclasses import dataclass, field, replace
 
 from ..data.scenario import MAX_SLOTS, PROMPT_BYTES, Field, Scenario
+from . import names as N
 
 
 # ---------------------------------------------------------------- configuration
@@ -95,49 +96,22 @@ DISTRACTORS = [  # state fields that never matter for the request
     ("batt_pct", 0, 100), ("co2_ppm", 400, 2000),
 ]
 
-STYLES = ["same", "swap", "set", "dot"]
-
-
-KIND_CODES = {"lite": "lite", "lit": "lite", "l": "lite", "temp": "temp", "tem": "temp", "t": "temp",
-              "fan": "fan", "f": "fan", "blnd": "blnd", "bln": "blnd", "b": "blnd"}
+STYLES = N.STYLES                      # tool / state naming styles: dink/gen/names.py
 
 
 def split_name(name):
     """(room, kind) of a room-device name in any naming style, else (None, None)."""
-    for sep in ("_", "."):
-        if sep in name:
-            a, b = name.split(sep, 1)
-            if a == "set" and b[:-1] in ROOM_CODES and b[-1] in KIND_CODES:     # set_kitl
-                return b[:-1], KIND_CODES[b[-1]]
-            if a in ROOM_CODES and b in KIND_CODES:                             # kit_lite, kit.lit
-                return a, KIND_CODES[b]
-            if b in ROOM_CODES and a in KIND_CODES:                             # lite_kit
-                return b, KIND_CODES[a]
-    return None, None
+    room, kind = N.parse(name)
+    return (room, kind) if kind in KINDS else (None, None)
 
 
 def room_of(name):
-    if name.startswith("occ_"):
-        return name[4:]
-    return split_name(name)[0]
+    room, kind = N.parse(name)
+    return room if kind in KINDS or kind == "occ" else None
 
 
 def kind_of(name):
-    if name.startswith("occ_"):
-        return None
     return split_name(name)[1]
-
-
-def tool_name(style, room, kind):
-    if style == "same":
-        return f"{room}_{kind}"
-    if style == "swap":
-        return f"{kind}_{room}"
-    if style == "set":
-        return f"set_{room}{kind[0]}"
-    if style == "dot":
-        return f"{room}.{kind[:3]}"
-    raise ValueError(style)
 
 
 # ---------------------------------------------------------------- prompt templates
@@ -329,7 +303,7 @@ class HomeGen:
     def _try(self):
         rng = self.rng
         intent = rng.choices([n for n, _ in self.INTENTS], [w for _, w in self.INTENTS])[0]
-        style = rng.choice(STYLES)
+        style = self.style = rng.choice(STYLES)
         self.uses = {"words": [], "templates": [], "style": style,
                      "units": "C" if rng.random() < self.cfg.celsius else "F"}
         devs, rooms = self.build_house()
@@ -338,8 +312,16 @@ class HomeGen:
         return getattr(self, "_" + intent.split("_")[0])(intent, devs, rooms, style, n_tools, n_state)
 
     # ---------------------------------------------------------------- tools and state
+    def state_name(self, canon):
+        """A device's state field name in this scenario's naming style."""
+        for key, h in HOUSE.items():
+            if h["canon"] == canon:
+                return N.house_state(self.style, key)
+        room, kind = canon.split("_", 1)
+        return N.state(self.style, room, kind)
+
     def tools_for(self, d: Device, style, values):
-        name = HOUSE[d.room]["names"][style] if d.room in HOUSE else tool_name(style, d.room, d.kind)
+        name = N.house_tool(style, d.room) if d.room in HOUSE else N.tool(style, d.room, d.kind)
         return [Field(name, v, d.lo, d.hi) for v in values]
 
     def assemble(self, devs, style, n_tools, n_state, must_tools, extra_devs, needed_state, occ=None):
@@ -359,7 +341,7 @@ class HomeGen:
             if all((f.name, f.value) != (t.name, t.value) for t in tools):
                 tools.append(f)
         if rng.random() < 0.3 and len(tools) < n_tools:          # a scene tool as a distractor
-            scene = rng.choice(list(SCENES))
+            scene = N.scene(style, rng.choice(list(SCENES)))
             if all(t.name != scene for t in tools):
                 tools.append(Field(scene, 0, 0, 0, arg=False))
         if len(tools) > min(MAX_SLOTS, self.cfg.tool_slots[1]):
@@ -367,19 +349,19 @@ class HomeGen:
         # state: needed fields, occupancy, then other devices, then distractors
         state = {}
         for d in needed_state:
-            state[d.canon] = Field(d.canon, d.value, d.lo, d.hi)
+            state[d.canon] = Field(self.state_name(d.canon), d.value, d.lo, d.hi)
         for code, v in (occ or {}).items():
-            state[f"occ_{code}"] = Field(f"occ_{code}", v, 0, 1)
+            state[f"occ_{code}"] = Field(N.occupancy(style, code), v, 0, 1)
         others = [d for d in devs if d.canon not in state]
         rng.shuffle(others)
         for d in others:
             if len(state) >= n_state:
                 break
-            state[d.canon] = Field(d.canon, d.value, d.lo, d.hi)
+            state[d.canon] = Field(self.state_name(d.canon), d.value, d.lo, d.hi)
         for name, lo, hi in rng.sample(DISTRACTORS, len(DISTRACTORS)):
             if len(state) >= n_state:
                 break
-            state[name] = Field(name, float(rng.randint(lo, hi)), lo, hi)
+            state[name] = Field(N.distractor(style, name), float(rng.randint(lo, hi)), lo, hi)
         if len(state) > min(MAX_SLOTS, self.cfg.state_slots[1]):
             return None, None
         return tools, list(state.values())
@@ -425,6 +407,7 @@ class HomeGen:
         if not target_idx:
             target[-1] = 1.0
         self.rng.shuffle(state)
+        needed = [self.state_name(c) for c in needed]
         uses = dict(self.uses, n_state=len(state), n_tools=len(tools),
                     rooms=sorted({code for f in state + tools for code in [room_of(f.name)] if code}),
                     kinds=sorted({k for f in state + tools for k in [kind_of(f.name)] if k}))
@@ -622,10 +605,10 @@ class HomeGen:
     def _scene(self, intent, devs, rooms, style, n_tools, n_state):
         rng = self.rng
         scene = rng.choice(list(SCENES))
-        must = [Field(scene, 0, 0, 0, arg=False)]
+        must = [Field(N.scene(style, scene), 0, 0, 0, arg=False)]
         other_scenes = [s for s in SCENES if s != scene]
         if rng.random() < 0.5:
-            must.append(Field(rng.choice(other_scenes), 0, 0, 0, arg=False))
+            must.append(Field(N.scene(style, rng.choice(other_scenes)), 0, 0, 0, arg=False))
         tools, state = self.assemble(devs, style, n_tools, n_state, must, devs, [])
         prompt, chunks = self.from_bank("scene", scene) or self.render(self.w(SCENES[scene]))
         return self.finish(intent, "scene", tools, state, {0: 1.0}, prompt, chunks)

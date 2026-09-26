@@ -17,6 +17,7 @@ import random
 import numpy as np
 
 from ..gen import home as H
+from ..gen import names as N
 from ..gen.__main__ import generate
 
 HELD = json.load(open("configs/home_split.json"))
@@ -99,9 +100,10 @@ def describe(name):
     if room:
         words = next(r.words[0] for r in H.ROOMS if r.code == room)
         return f"{words} {H.KINDS[kind].nouns[0]}"
-    for key, h in H.HOUSE.items():
-        if name in h["names"].values():
-            return h["words"][0] + (" lock" if h["lock"] else "")
+    key, kind = N.parse(name)
+    if kind in ("lock", "door"):
+        h = H.HOUSE[key]
+        return h["words"][0] + (" lock" if h["lock"] else "")
     return {"goodnite": "goodnight scene", "away": "away from home scene", "all_off": "turn everything off"}.get(name, name)
 
 

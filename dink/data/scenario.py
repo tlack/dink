@@ -8,14 +8,14 @@ the plausible tools.
 from dataclasses import asdict, dataclass, field
 import json
 
-NAME_BYTES = 8      # state field and tool names
+NAME_BYTES = 40     # state field and tool names (dink/gen/names.py: up to 35 in the smart home)
 PROMPT_BYTES = 64
 MAX_SLOTS = 8       # state fields, and separately tools
 
 
 @dataclass
 class Field:
-    """A state field or a tool: an 8-byte name and a value within a declared range.
+    """A state field or a tool: a name (up to NAME_BYTES) and a value within a declared range.
     Tools without an argument (scenes) have arg=False and value 0."""
     name: str
     value: float
