@@ -42,8 +42,23 @@ STATE = [("bedroom_thermostat", "bed_temp", 70, 60, 85), ("bedroom_light", "bed_
          ("outdoor_temperature", "out_tmp", 55, -10, 110)]
 
 
-def cases():
+# Range ends vs near-end decoys (found by hand: "close the entrance gate" picked 0.16 over 0).
+GATE_STATE = [Field("entrance_gate_position", 0.6, 0, 1), Field("battery_level", 72, 0, 100)]
+GATE = [("close the entrance gate", [0.0, 0.16], 0.0), ("close the entrance gate", [0.0, 0.5], 0.0),
+        ("open the entrance gate fully", [1.0, 0.84], 1.0), ("open the entrance gate fully", [1.0, 0.3], 1.0)]
+
+
+def gate_cases():
     out = []
+    for prompt, values, right in GATE:
+        tools = [Field("set_entrance_gate_position", v, 0, 1) for v in values] + [Field("sound_alarm", 0, 0, 0, arg=False)]
+        target = [1.0 if t.arg and t.value == right else 0.0 for t in tools] + [0.0]
+        out.append(Scenario(GATE_STATE, prompt, tools, target, {"cls": "hard_ends"}).check())
+    return out
+
+
+def cases():
+    out = gate_cases()
     for style, i in (("long", 0), ("short", 1)):
         state = [Field(f[i], f[2], f[3], f[4]) for f in STATE]
         keys = list(TOOLS) + ["scene"]
