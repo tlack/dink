@@ -122,6 +122,8 @@ def main():
     noise = [(A.asr_noise, 1.0), (A.typos, 1.0), (A.fillers, 0.5)]
     nrng = random.Random(123)
     tests["test_noise"] = [A.augment(s, nrng, noise) for s in tests["test_indist"]]
+    from .evals.hard import cases
+    tests["hard"] = cases()
     if a.also:
         tests |= {"old:" + p.stem: load(p) for p in sorted(Path(a.also).glob("test_*.jsonl"))}
 

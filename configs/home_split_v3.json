@@ -1,0 +1,76 @@
+{
+  "_doc": "v2 plus descriptive naming styles (dink/gen/names.py): the 'camel' style (bedroomLight) is held out along with 'dot', so test_styles checks an unseen long style too.",
+  "words": [
+    "a touch ",
+    "a whole lot ",
+    "carport door",
+    "ceiling fan",
+    "chillier",
+    "climate",
+    "curtains",
+    "family room",
+    "gentler",
+    "harder",
+    "lamps",
+    "less bright",
+    "less open",
+    "main door",
+    "master bedroom",
+    "more lit",
+    "nighty night",
+    "order a pizza",
+    "rear door",
+    "remind me to water the plants",
+    "see you later house",
+    "shut it all down",
+    "study",
+    "toastier",
+    "washroom",
+    "what's on my calendar",
+    "who won the game last night",
+    "wider",
+    "would you mind "
+  ],
+  "templates": [
+    "brr it's frigid{loc}",
+    "did i leave the {room}{dev} on",
+    "i'm roasting{loc}",
+    "it's gloomy{loc}",
+    "the glare is awful{loc}",
+    "{int}{cmp} {room}{dev} please",
+    "{pol}dim the {room}{dev} to {num} percent",
+    "{pol}fire up the {room}{dev}",
+    "{pol}flip the {room}{dev} on",
+    "{pol}get the {room}{dev} {int}{cmp}",
+    "{pol}lower the {room}{dev}",
+    "{pol}put the {room}{dev} at {num}",
+    "{pol}put the {room}{dev} on {num}",
+    "{pol}raise the {dev}",
+    "{pol}raise the {room}{dev}",
+    "{pol}secure the {dev}",
+    "{pol}shut down the {room}{dev}",
+    "{pol}shut off the {room}{dev}",
+    "{pol}shut the {dev}",
+    "{pol}unbolt the {dev}"
+  ],
+  "rooms": [
+    "den"
+  ],
+  "styles": [
+    "dot",
+    "camel"
+  ],
+  "units": [
+    "C"
+  ],
+  "slots": {
+    "max_state": 6,
+    "max_tools": 6
+  },
+  "fractions": {
+    "val": 0.1,
+    "test_indist": 0.1
+  },
+  "max_test": 500,
+  "llm_holdout": 0.15
+}
