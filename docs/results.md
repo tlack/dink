@@ -101,3 +101,35 @@ Next:
 - More varied phrasing in the Dink training data itself (LLM paraphrases; currently 200 lines).
 - A bigger pool, so that 10k+ records avoid all holdouts.
 - Distillation pairs that teach composition ("less X" vs "more X").
+
+## 2026-09-25: more data, on the GPU; LLM phrasings as prompts
+
+GPU (RTX 5080 laptop): batch 512, 10,000 steps, distilled tv128 start, ~11 min per run.
+Both pools have 400k records split with the same holdouts. `old:` = the exact test sets
+from the runs above (`data/home/split`).
+
+- **big_tmpl**: hand templates only (`split_big`, 21,855 train).
+- **big_llm**: half of all prompts swapped for LLM phrasings of the same meaning (`split_v2`,
+  31,485 train, 3,324 distinct LLM phrasings in train). The bank is `dink/llm/phrases.py`:
+  4,770 phrasings, 164 requests, with rotating speaker personas. Phrases that use a
+  held-out word or template are routed to the test sets, and 15% of phrasings are held
+  out as test_llm.
+
+| set | best 3k run (b3k_distilled) | big_tmpl | big_llm |
+|---|---|---|---|
+| old:test_indist | 0.980 | 0.995 | 1.000 |
+| old:test_words | 0.744 | 0.778 | **0.846** |
+| old:test_templates | 0.704 | 0.736 | **0.952** |
+| old:test_mixed | 0.734 | 0.748 | **0.806** |
+| test_llm (held-out LLM phrasings) | | 0.544 | **0.894** |
+
+Readings:
+- 7x more template data: in-distribution ~0.99, but new wording barely moves (words 0.74 -> 0.78).
+- The template-only model gets 0.54 on held-out LLM phrasings. Trained on templates, it
+  handles only about half of natural wording.
+- LLM phrasings: held-out templates 0.74 -> 0.95, words 0.78 -> 0.85, LLM phrasings 0.54 -> 0.89.
+  Variety in the training prompts is the lever, not volume.
+- Caveat: the annotator catches held-out wording only literally. "Toasty" can still reach
+  training while "toastier" is held out, so test_words and test_templates now measure
+  "this exact wording never seen" more than "this idea never seen".
+- The bank has some label noise, e.g. "why is the front door unlocked?" filed as *lock it*.
