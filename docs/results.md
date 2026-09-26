@@ -172,3 +172,29 @@ Readings:
   wrong value, 11% wrong tool (world knowledge: "the image is too dark" -> exposure).
 - The framing hard cases haven't moved. The world data's desire / complaint examples don't
   yet carry over to the smart home's "make it dark".
+
+## 2026-09-26: all 1,000 worlds
+
+`all_worlds`: all 1,000 worlds -> 129,578 scenarios (73,603 in training, 70% of it), with the
+same holdouts (split_v5: the same 5 unseen areas; worlds held out by the same name hash).
+20,000 steps, double the earlier runs, since there is about twice the data. So the gain mixes
+data and training length. 24 thermal pauses of 10-18 s; peak 81C.
+
+| set | big_worlds (250 worlds, 10k steps) | all_worlds (1,000 worlds, 20k steps) |
+|---|---|---|
+| test_areas (5 unseen areas) | 0.798 | **0.892** |
+| test_worlds (unseen settings) | 0.814 | **0.894** |
+| smart home old:test_words | 0.846 | 0.876 |
+| smart home old:test_templates | 0.944 | 0.938 |
+| smart home old:test_llm | 0.832 | 0.822 |
+| hard cases | 20/28 | 21/28 |
+
+(big_worlds is re-scored here on split_v5's test sets, which sample more worlds.)
+
+Unseen areas by request kind: complaint 0.50 -> 0.73, desire 0.64 -> 0.78, slang 0.67 -> 0.81,
+direct 0.68 -> 0.90, "a lot" 0.65 -> 0.84, "a bit" 0.76 -> 0.95; numbers, questions and
+unrelated requests 1.00.
+
+Still wrong in the smart home: "i want it cold in here" -> warmer (the complaint reading of
+"cold"), "hot as hell" and "super bright" are under-scaled, and "make it really dark" is fixed
+in long names only.
