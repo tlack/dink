@@ -25,6 +25,7 @@ persona) in the final user message. The live log shows cached/total input tokens
 import hashlib
 import json
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -55,7 +56,8 @@ class Client:
         load_env()
         self.key = os.environ.get("OPENROUTER_KEY")
         self.model = model or os.environ.get("OPENROUTER_MODEL")
-        self.provider = provider                # e.g. "Groq": route only there, no fallbacks
+        self.provider = provider                # "Groq" (by name) or "parasail/fp8" (an endpoint tag): only there
+        self.lock = threading.Lock()            # chat() may be called from several threads
         self.max_spend_per_day = max_spend_per_day
         self.tokens = {"in": 0, "cached": 0, "out": 0, "cost": 0.0}
         if not self.key or not self.model:
@@ -72,6 +74,13 @@ class Client:
         self._last = 0.0
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
+
+    @classmethod
+    def parasail(cls, **kw):
+        """DeepSeek V4.1 Flash on Parasail (fp8, ~300 tokens/s): $0.30/M in, $0.006/M cached, $1.20/M out."""
+        kw.setdefault("min_interval", 0.2)
+        kw.setdefault("max_per_day", 20000)
+        return cls(model="deepseek/deepseek-v4.1-flash", provider="parasail/fp8", **kw)
 
     @classmethod
     def groq(cls, **kw):
@@ -132,10 +141,13 @@ class Client:
     def body(self, messages, temperature=0.9, max_tokens=800, reasoning_effort="low", **extra):
         b = {"model": self.model, "messages": messages, "temperature": temperature,
              "max_tokens": max_tokens, **extra}
-        if reasoning_effort:            # reasoning models: less hidden thinking, faster, cheaper
+        if reasoning_effort == "off":    # no hidden thinking at all (where the model allows it)
+            b["reasoning"] = {"enabled": False}
+        elif reasoning_effort:          # reasoning models: less hidden thinking, faster, cheaper
             b["reasoning"] = {"effort": reasoning_effort}
         if self.provider:
-            b["provider"] = {"order": [self.provider], "allow_fallbacks": False}
+            where = "only" if "/" in self.provider else "order"
+            b["provider"] = {where: [self.provider], "allow_fallbacks": False}
         return b
 
     def forget(self, messages, **kw):
@@ -152,16 +164,17 @@ class Client:
             return text
         t0 = time.time()
         for attempt in range(6):
-            self._check_budget()
-            wait = self.min_interval - (time.time() - self._last)
-            if wait > 0:
-                time.sleep(wait)
-            self._last = time.time()
+            with self.lock:
+                self._check_budget()
+                wait = self.min_interval - (time.time() - self._last)
+                if wait > 0:
+                    time.sleep(wait)
+                self._last = time.time()
+                self.requests += 1
+                self._count()
             req = urllib.request.Request(URL, data=json.dumps(body).encode(), headers={
                 "Authorization": f"Bearer {self.key}", "Content-Type": "application/json",
                 "X-Title": "dink-model data generation"})
-            self.requests += 1
-            self._count()
             retry_after, detail = None, ""
             try:
                 with urllib.request.urlopen(req, timeout=self.timeout) as r:
@@ -193,19 +206,21 @@ class Client:
         text = resp["choices"][0]["message"].get("content") or ""
         u = resp.get("usage") or {}
         cost = float(u.get("cost") or 0.0)
-        self.tokens["in"] += u.get("prompt_tokens", 0) or 0
-        self.tokens["cached"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0) or 0
-        self.tokens["out"] += u.get("completion_tokens", 0) or 0
-        self.tokens["cost"] += cost
-        if cost:
-            self._count(cost)
-        hit.write_text(json.dumps({"body": body, "text": text, "usage": resp.get("usage")}))
-        self._log("ok", body, text, time.time() - t0, resp.get("usage"))
+        with self.lock:
+            self.tokens["in"] += u.get("prompt_tokens", 0) or 0
+            self.tokens["cached"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0) or 0
+            self.tokens["out"] += u.get("completion_tokens", 0) or 0
+            self.tokens["cost"] += cost
+            if cost:
+                self._count(cost)
+            hit.write_text(json.dumps({"body": body, "text": text, "usage": resp.get("usage")}))
+            self._log("ok", body, text, time.time() - t0, resp.get("usage"))
         return text
 
     def _fail(self, body, detail, secs):
-        self._log("FAILED", body, detail, secs)
-        self.errors_in_a_row += 1
+        with self.lock:
+            self._log("FAILED", body, detail, secs)
+            self.errors_in_a_row += 1
         if self.errors_in_a_row >= self.max_consecutive_errors:
             raise Budget(f"{self.errors_in_a_row} failed calls in a row; stopping")
 
@@ -214,6 +229,25 @@ class Client:
         share = t["cached"] / t["in"] if t["in"] else 0.0
         return (f"{self.requests} requests, {self.cache_hits} from disk cache; tokens in {t['in']} "
                 f"({share:.0%} provider-cached), out {t['out']}; ${t['cost']:.4f}")
+
+    def json_obj(self, prompt, system=None, **kw):
+        """Ask for a JSON object (JSON mode); returns the parsed dict, or {} if the reply isn't one."""
+        msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+        kw.setdefault("response_format", {"type": "json_object"})
+        text = self.chat(msgs, **kw).strip()
+        if "```" in text:
+            text = text.split("```")[1].removeprefix("json").strip()
+        start, end = text.find("{"), text.rfind("}")
+        out = None
+        if 0 <= start < end:
+            try:
+                out = json.loads(text[start:end + 1])
+            except json.JSONDecodeError:
+                pass
+        if not isinstance(out, dict):
+            self.forget(msgs, **kw)             # never keep an unusable reply in the cache
+            return {}
+        return out
 
     def json_list(self, prompt, system=None, **kw):
         """Ask for a JSON array; returns the parsed list, or [] if the reply isn't one."""
