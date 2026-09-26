@@ -198,3 +198,28 @@ unrelated requests 1.00.
 Still wrong in the smart home: "i want it cold in here" -> warmer (the complaint reading of
 "cold"), "hot as hell" and "super bright" are under-scaled, and "make it really dark" is fixed
 in long names only.
+
+## 2026-09-26: scenario descriptions: no effect, dropped
+
+`all_worlds_scn` = all_worlds (same split, seed and 20k steps) plus a scenario description:
+- worlds: "<setting>. <about>";
+- smart-home houses: a generated description of their rooms and devices.
+
+It is encoded by T (extended to 128 bytes) into 2 extra mixer tokens, and removed from 30% of
+training draws. It adds 2,112 parameters.
+
+| set | without | with scenario | same model, scenario removed at test |
+|---|---|---|---|
+| test_areas | 0.892 | 0.904 | 0.904 |
+| test_worlds | 0.894 | 0.872 | 0.878 |
+| test_llm | 0.858 | 0.890 | 0.886 |
+| test_words | 0.856 | 0.878 | 0.876 |
+
+The last column settles it. Removing the scenario from the trained model changes accuracy by
+at most 0.008, so the model doesn't use the tokens. Differences between the two runs are
+training noise: the extra tokens and dropout change the random stream. Likely reason: the
+state and action names already carry the context (`chamber_temperature_celsius`,
+`set_cooling_power`), and the description adds little beyond them.
+
+Decision: scenarios off. The code stays (`--scenario`, off by default) and costs nothing
+unless enabled. No LLM spend was involved.
