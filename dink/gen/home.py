@@ -18,6 +18,7 @@ class GenConfig:
     celsius: float = 0.15       # share of houses with Celsius thermostats
     state_slots: tuple = (2, 8)
     tool_slots: tuple = (2, 8)
+    bank_p: float = 0.5         # with an LLM phrase bank: share of prompts taken from it
 
 
 # ---------------------------------------------------------------- the house
@@ -208,6 +209,7 @@ OFF_DOMAIN = ["what time is it", "play some jazz", "tell me a joke",
               "call mom", "set a timer for ten minutes", "how are you",
               "who won the game last night", "order a pizza",
               "remind me to water the plants", "what's on my calendar"]
+NUMERIC_ALL = [t for v in NUMERIC.values() for t in v]
 QUESTIONS = ["is the {dev} locked", "are the {room}{dev} on",
              "what's the temperature{loc}", "is the {dev} open",
              "did i leave the {room}{dev} on"]
@@ -251,10 +253,23 @@ class Device:
 
 
 class HomeGen:
-    def __init__(self, cfg: GenConfig = None, seed: int = 0):
+    def __init__(self, cfg: GenConfig = None, seed: int = 0, bank=None):
         self.cfg = cfg or GenConfig()
         self.rng = random.Random(seed)
         self.uses = {}
+        self.bank = bank or {}                  # dink/gen/bank.py: {key: [phrases]}
+
+    def from_bank(self, *key):
+        """Maybe replace the template prompt with an LLM phrasing of the same meaning. Its
+        uses are recomputed from the phrase itself (dink/gen/bank.py: annotate)."""
+        opts = self.bank.get(key)
+        if not opts or self.rng.random() >= self.cfg.bank_p:
+            return None
+        from .bank import annotate, phrase_id
+        text = self.rng.choice(opts)
+        self.uses["words"], self.uses["templates"] = annotate(text)
+        self.uses["llm"] = [phrase_id(text)]
+        return text, [[text, "core"]]
 
     # -- helpers
     def w(self, options):
@@ -468,8 +483,9 @@ class HomeGen:
         others = [x for x in devs if x not in cands]
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, needed, occ)
         cmp = self.w(k.up if up else k.down)
-        prompt, chunks = self.render(self.t(RELATIVE), dev=self.w(k.nouns), room_code=d.room, cmp=cmp,
-                                     intensity=intensity, mention_room=mention)
+        prompt, chunks = self.from_bank("relative", d.kind, direction, intensity, d.room if mention else None) \
+            or self.render(self.t(RELATIVE), dev=self.w(k.nouns), room_code=d.room, cmp=cmp,
+                           intensity=intensity, mention_room=mention)
         cls = "limit" if force_limit else ("relative_" + intensity)
         s = self.finish(intent, cls, tools, state, target, prompt, chunks,
                         room=",".join(sorted({x.room for x in cands})) or d.room,
@@ -520,8 +536,9 @@ class HomeGen:
             target[base + keep.index(best)] = 1.0
         others = [x for x in devs if x not in cands]
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, cands, occ)
-        prompt, chunks = self.render(self.t(TURN[(d.kind, on)]), dev=self.w(k.nouns), room_code=d.room,
-                                     mention_room=mention)
+        prompt, chunks = self.from_bank("turn", d.kind, on, d.room if mention else None) \
+            or self.render(self.t(TURN[(d.kind, on)]), dev=self.w(k.nouns), room_code=d.room,
+                           mention_room=mention)
         return self.finish(intent, "turn", tools, state, target, prompt, chunks,
                            room=",".join(sorted({x.room for x in cands})) or d.room,
                            ambiguous=len(target) > 1, needed=[x.canon for x in cands])
@@ -551,7 +568,8 @@ class HomeGen:
                 target[base + keep.index(best)] = 1.0
         others = [x for x in devs if x not in cands]
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, cands, occ)
-        prompt, chunks = self.render(text, room_code=d.room, mention_room=mention)
+        prompt, chunks = self.from_bank("indirect", d.kind, direction, intensity, d.room if mention else None) \
+            or self.render(text, room_code=d.room, mention_room=mention)
         s = self.finish(intent, "indirect_" + intensity, tools, state, target, prompt, chunks,
                         room=",".join(sorted({x.room for x in cands})) or d.room,
                         ambiguous=len(target) > 1, needed=[x.canon for x in cands])
@@ -597,7 +615,8 @@ class HomeGen:
         target = {[t.value for t in must].index(want): 1.0}
         others = [x for x in devs if x is not d]
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, [d])
-        prompt, chunks = self.render(self.t(LOCKS[(d.kind, on)]), dev=self.w(d.words))
+        prompt, chunks = self.from_bank("lock", d.room, on) or self.render(self.t(LOCKS[(d.kind, on)]),
+                                                                            dev=self.w(d.words))
         return self.finish(intent, "lock", tools, state, target, prompt, chunks, room=d.room, needed=[d.canon])
 
     def _scene(self, intent, devs, rooms, style, n_tools, n_state):
@@ -608,7 +627,7 @@ class HomeGen:
         if rng.random() < 0.5:
             must.append(Field(rng.choice(other_scenes), 0, 0, 0, arg=False))
         tools, state = self.assemble(devs, style, n_tools, n_state, must, devs, [])
-        prompt, chunks = self.render(self.w(SCENES[scene]))
+        prompt, chunks = self.from_bank("scene", scene) or self.render(self.w(SCENES[scene]))
         return self.finish(intent, "scene", tools, state, {0: 1.0}, prompt, chunks)
 
     # ---------------------------------------------------------------- "nothing relevant"
@@ -629,20 +648,22 @@ class HomeGen:
             tools, state = self.assemble(devs, style, n_tools, n_state, [], others, [d])
             if not tools:
                 return None
-            prompt, chunks = self.render(self.t(RELATIVE), dev=self.w(k.nouns), room_code=d.room,
-                                         cmp=self.w(k.up if up else k.down),
-                                         intensity=rng.choice(["small", "default", "big"]))
+            inten = rng.choice(["small", "default", "big"])
+            kind = "indirect" if d.kind in ("temp", "lite") and rng.random() < 0.3 else "relative"
+            prompt, chunks = self.from_bank(kind, d.kind, 1 if up else -1, inten, d.room) \
+                or self.render(self.t(RELATIVE), dev=self.w(k.nouns), room_code=d.room,
+                               cmp=self.w(k.up if up else k.down), intensity=inten)
             return self.finish(intent, "none_missing", tools, state, {}, prompt, chunks, room=d.room)
         tools, state = self.assemble(devs, style, n_tools, n_state, [], devs, [])
         if not tools:
             return None
         if kind == "offdomain":
-            prompt, chunks = self.render(self.w(OFF_DOMAIN))
+            prompt, chunks = self.from_bank("offdomain") or self.render(self.w(OFF_DOMAIN))
         elif kind == "question":
             d = rng.choice(devs)
             words = self.w(d.words) if d.words else self.w(d.kobj.nouns)
-            prompt, chunks = self.render(self.t(QUESTIONS), dev=words,
-                                         room_code=None if d.room in HOUSE else d.room)
+            prompt, chunks = self.from_bank("question") or self.render(
+                self.t(QUESTIONS), dev=words, room_code=None if d.room in HOUSE else d.room)
         else:                                   # noise
             letters = "abcdefghijklmnopqrstuvwxyz     "
             prompt = "".join(rng.choice(letters) for _ in range(rng.randint(3, 30))).strip() or "hmm"

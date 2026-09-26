@@ -90,3 +90,20 @@ def test_json_roundtrip_and_encode(pool):
     b = batch(pool[:64])
     assert b["prompt"].shape == (64, 64) and b["tool_name"].shape == (64, 8, 8)
     assert np.allclose(b["target"].sum(1), 1)
+
+
+def test_bank_phrases_are_annotated_and_held_out():
+    from dink.data.split import split
+    from dink.gen.bank import phrase_id
+    from dink.gen.home import GenConfig, HomeGen
+    bank = {("scene", s): [f"please {s} now", "shut it all down for me"] for s in ("goodnite", "away", "all_off")}
+    bank[("offdomain",)] = ["what's the capital of peru", "sing me a song"]
+    g = HomeGen(GenConfig(bank_p=1.0), seed=0, bank=bank)
+    items = [g.sample() for _ in range(3000)]
+    used = [s for s in items if s.meta["uses"].get("llm")]
+    assert used and all(s.meta["uses"]["llm"] == [phrase_id(s.prompt)] for s in used)
+    cfg = {"words": ["shut it all down"], "llm_holdout": 0.5, "fractions": {"val": 0.1, "test_indist": 0.1}}
+    sets, _ = split(items, cfg, seed=0)
+    for s in sets["train"] + sets["val"]:
+        assert "shut it all down" not in s.prompt
+    assert sets.get("test_llm")

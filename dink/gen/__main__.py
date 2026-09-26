@@ -11,8 +11,8 @@ from pathlib import Path
 from .home import GenConfig, HomeGen
 
 
-def generate(n, seed, cfg=None):
-    g = HomeGen(cfg or GenConfig(), seed)
+def generate(n, seed, cfg=None, bank=None):
+    g = HomeGen(cfg or GenConfig(), seed, bank)
     return [g.sample() for _ in range(n)]
 
 
@@ -37,9 +37,14 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--show", type=int, default=0)
     ap.add_argument("--stats", action="store_true")
+    ap.add_argument("--bank", default=None, help="LLM phrase bank (data/llm/phrases.jsonl)")
+    ap.add_argument("--bank-p", type=float, default=0.5, help="share of prompts taken from the bank")
     a = ap.parse_args()
+    cfg = GenConfig(bank_p=a.bank_p)
+    from .bank import load
+    bank = load(a.bank) if a.bank else None
     if a.show or a.stats:
-        items = generate(max(a.show, 2000 if a.stats else 0), a.seed)
+        items = generate(max(a.show, 2000 if a.stats else 0), a.seed, cfg, bank)
         for s in items[: a.show]:
             print(s.show() + "\n")
         if a.stats:
@@ -47,7 +52,7 @@ def main():
         return
     out = Path(a.out)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("".join(s.to_json() + "\n" for s in generate(a.n, a.seed)))
+    out.write_text("".join(s.to_json() + "\n" for s in generate(a.n, a.seed, cfg, bank)))
     print(f"wrote {a.n} scenarios to {out}")
 
 

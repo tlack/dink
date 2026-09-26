@@ -1,8 +1,8 @@
 __pycache__/
 .venv/
 .pytest_cache/
-data/
-runs/
+/data/
+/runs/
 # secrets, including editor backups and swap files of .env
 .env*
 *.swp
