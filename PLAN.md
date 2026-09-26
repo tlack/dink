@@ -183,6 +183,12 @@ mean?" when Dink answers "nothing relevant" or is unsure.
   brightness, per-channel color, quadrant hues, edge-orientation counts) from a camera
   frame, e.g. car vs. plane. Needs more state slots (16-64) and good hand-made features.
 
+- **Enumerated values** ("play country music"): no ordering, so never map categories to
+  numbers. Options: (a) one tool per category (`play_country`), simplest but uses slots;
+  (b) text-valued arguments: the argument is text ("country") encoded by the text encoder
+  and cached, fused like a numeric value; (c) two passes: pick `play_music`, then run Dink
+  again with the genres as its options (pages of 8 for long lists). Leaning (b) + (c).
+
 ## Open questions
 
 - Prompts with explicit numbers ("set it to 72"): read the digits as bytes, or have the
