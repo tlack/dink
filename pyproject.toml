@@ -3,7 +3,12 @@ name = "dink"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
+    "datasets>=5.0.1",
     "numpy>=2.5.3",
+    "scikit-learn>=1.9.1",
+    "sentence-transformers>=6.1.0",
+    "torch>=2.14.0",
+    "wordfreq>=3.1.1",
 ]
 
 [dependency-groups]
@@ -13,3 +18,11 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }

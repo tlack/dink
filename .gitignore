@@ -3,3 +3,7 @@ __pycache__/
 .pytest_cache/
 data/
 runs/
+# secrets, including editor backups and swap files of .env
+.env*
+*.swp
+*~
