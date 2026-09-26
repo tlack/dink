@@ -192,13 +192,24 @@ def mark_int(world):
 
 
 def candidates(a, cur, target, rng):
-    """Near-miss values for the right action around its target."""
+    """Near-miss values for the right action around its target.
+
+    The range ends are added only sometimes: always offering lo and hi as decoys taught the
+    model that an end value is usually wrong ("close the gate" picked 0.16 over 0). When the
+    target IS an end, a near-end decoy teaches "fully" = the end, not almost."""
     span = a["hi"] - a["lo"]
     base = cur if cur is not None else rng.uniform(a["lo"], a["hi"])
     d = target - base if abs(target - base) > 1e-9 else span * 0.2
-    raw = [base - d, base + 0.35 * d, base + 2.2 * d, a["lo"], a["hi"], base]
+    raw = [base - d, base + 0.35 * d, base + 2.2 * d, base]
+    raw += [e for e in (a["lo"], a["hi"]) if rng.random() < 0.3]
+    if target == a["lo"]:
+        raw.append(a["lo"] + rng.uniform(0.1, 0.2) * span)
+    elif target == a["hi"]:
+        raw.append(a["hi"] - rng.uniform(0.1, 0.2) * span)
     out = []
     for v in raw:
+        if not a["lo"] <= v <= a["hi"]:
+            continue                    # dropped, not clamped: clamping piled decoys onto the ends
         v = rnd(v, a)
         if abs(v - target) >= 0.08 * span and all(abs(v - o) >= 0.05 * span for o in out):
             out.append(v)

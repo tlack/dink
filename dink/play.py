@@ -88,6 +88,9 @@ def load_model(run, device):
 
 @torch.no_grad()
 def ask(model, state, tools, prompt, answer=None):
+    if not tools:
+        print("  no tools offered: give some with :tools (the model picks among them)")
+        return
     s = Scenario(state, prompt, tools, [0.0] * len(tools) + [1.0])
     x = collate([s])
     dev = next(model.parameters()).device

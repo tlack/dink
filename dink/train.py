@@ -30,7 +30,19 @@ from .model.dink import SLOTS, Dink
 
 
 def load(path):
-    return [Scenario.from_json(l) for l in Path(path).read_text().splitlines() if l.strip()]
+    """Scenarios from a .jsonl file; records that fail Scenario.check (no tools, bad targets,
+    values out of range, ...) are skipped and counted, never trained on."""
+    out, bad = [], 0
+    for line in Path(path).read_text().splitlines():
+        if line.strip():
+            s = Scenario.from_json(line)
+            try:
+                out.append(s.check())
+            except AssertionError:
+                bad += 1
+    if bad:
+        print(f"  {path}: skipped {bad} invalid records", flush=True)
+    return out
 
 
 def is_nothing(s):
