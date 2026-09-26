@@ -12,6 +12,7 @@
 """
 import argparse
 import json
+import random
 
 import numpy as np
 
@@ -119,14 +120,78 @@ def probe_abstention(embed, n=1500):
     return roc_auc_score(labels, scores), sum(labels), len(labels) - sum(labels)
 
 
-def run(embed):
+LOW = ["off", "at the minimum", "very low", "empty", "the lowest setting"]
+HIGH = ["at the maximum", "very high", "full", "maxed out", "the highest setting"]
+
+
+def extreme_items(n=600, seed=7):
+    """Items at unseen values near the ends of their range, for every value type."""
+    from ..llm.values import TYPES
+    from .values_corpus import NAMES
+    rng = random.Random(seed)
+    items = []
+    for tid, noun, lo, hi, unit, integer, held in TYPES:
+        for _ in range(n // len(TYPES)):
+            level = rng.uniform(0, 0.15) if rng.random() < 0.5 else rng.uniform(0.85, 1)
+            items.append({"type": tid, "name": rng.choice(NAMES[tid]), "value": round(lo + level * (hi - lo), 1),
+                          "lo": lo, "hi": hi, "held_out": held, "high": level > 0.5})
+    return items
+
+
+def verbalized(embed):
+    """Item embedder for a text-only model: the item written out in words."""
+    return lambda items: embed([f"the {i['name']} is at {i['value']:g} on a {i['lo']} to {i['hi']} scale"
+                                for i in items])
+
+
+def probe_value_items(embed_items, embed):
+    """Does an item near the bottom of its range sit nearer "off / minimum" than "maximum"?"""
+    items = extreme_items()
+    lo_a, hi_a = embed(LOW), embed(HIGH)
+    V = embed_items(items)
+    acc = {False: [0, 0], True: [0, 0]}
+    for it, v in zip(items, V):
+        ok = ((hi_a @ v).mean() > (lo_a @ v).mean()) == it["high"]
+        acc[it["held_out"]][0] += ok
+        acc[it["held_out"]][1] += 1
+    return acc[False][0] / acc[False][1], acc[True][0] / acc[True][1]
+
+
+NUMBER_PROBES = [  # template, lo, hi, low-end anchors, high-end anchors
+    ("set the thermostat to {v}", 60, 85, ["make it cold", "it's cold in here"], ["make it warm", "it's warm in here"]),
+    ("set the lights to {v} percent", 0, 100, ["make it dim", "dark"], ["make it bright", "full brightness"]),
+    ("set the volume to {v}", 0, 100, ["quiet", "soft music"], ["loud", "very loud music"]),
+]
+
+
+def probe_numbers(embed):
+    """Unseen (odd) numbers in a request: near the right end of the scale in meaning?"""
+    ok = n = 0
+    for tmpl, lo, hi, low, high in NUMBER_PROBES:
+        lo_a, hi_a = embed(low), embed(high)
+        vals = [v for v in range(lo, hi + 1) if v % 2 == 1 and ((v - lo) / (hi - lo) <= 0.25 or (v - lo) / (hi - lo) >= 0.75)]
+        V = embed([tmpl.format(v=v) for v in vals])
+        for v, e in zip(vals, V):
+            high_end = (v - lo) / (hi - lo) >= 0.75
+            ok += ((hi_a @ e).mean() > (lo_a @ e).mean()) == high_end
+            n += 1
+    return ok / n, n
+
+
+def run(embed, embed_items=None):
     d, nd = probe_directions(embed)
     v = score_triplets(embed, VALUE_CASES)
     auc, n_in, n_out = probe_abstention(embed)
+    num, n_num = probe_numbers(embed)
+    vi_train, vi_held = probe_value_items(embed_items or verbalized(embed), embed)
     print(f"  held-out word direction  {d:.2f}  ({nd} cases)")
     print(f"  values in words          {v:.2f}  ({len(VALUE_CASES)} cases)")
     print(f"  abstention AUC           {auc:.3f}  ({n_in} device requests vs {n_out} off-domain)")
-    return {"directions": d, "values": v, "abstention_auc": auc}
+    print(f"  numbers in requests      {num:.2f}  ({n_num} unseen numbers)")
+    print(f"  item values, known types {vi_train:.2f}   held-out types {vi_held:.2f}"
+          f"{'' if embed_items else '  (verbalized)'}")
+    return {"directions": d, "values": v, "abstention_auc": auc, "numbers": num,
+            "item_values_train_types": vi_train, "item_values_held_types": vi_held}
 
 
 def main():

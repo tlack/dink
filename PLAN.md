@@ -191,9 +191,11 @@ mean?" when Dink answers "nothing relevant" or is unsure.
 
 ## Open questions
 
-- Prompts with explicit numbers ("set it to 72"): read the digits as bytes, or have the
-  harness extract numbers from the prompt into a numeric slot? (Plan: try both in the
-  second experiment.)
+- Prompts with explicit numbers ("set it to 72"): **answered, extract them.** Even the
+  600M-parameter teacher places "set the thermostat to 83" no nearer "warm" than "cold"
+  (0.51 on 59 unseen numbers), so distillation cannot teach digits. The harness should pull
+  numbers out of the prompt into a numeric slot, where the value path (trained on LLM value
+  descriptions) gives them meaning.
 - Is 8 bytes enough for names? (We think yes, now that values travel separately.)
 - How much does the prompt encoder need to see word order vs. just which words appear?
 
