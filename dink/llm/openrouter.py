@@ -14,6 +14,13 @@ Safety rails, because generation jobs loop:
   data/llm/calls.jsonl (full prompt and reply). Cache hits are logged too.
 
 Credentials come from the environment or ./.env: OPENROUTER_KEY, OPENROUTER_MODEL.
+Client.groq() pins gpt-oss-120b to the Groq provider (fast; paid, so a dollar cap applies:
+max_spend_per_day, counted on disk from each reply's reported cost).
+
+Prompt caching: providers cache the longest repeated *prefix* of a request, and cached input
+tokens cost about half. So callers put everything that stays the same (instructions, rules,
+output format) in the system message, first, and only the part that changes (the task, the
+persona) in the final user message. The live log shows cached/total input tokens per call.
 """
 import hashlib
 import json
@@ -44,10 +51,13 @@ def load_env(path=".env"):
 class Client:
     def __init__(self, model=None, max_requests=50, max_per_day=500, min_interval=3.5,
                  cache_dir="data/llm_cache", timeout=180, max_consecutive_errors=5,
-                 log_dir="data/llm"):
+                 log_dir="data/llm", provider=None, max_spend_per_day=5.0):
         load_env()
         self.key = os.environ.get("OPENROUTER_KEY")
         self.model = model or os.environ.get("OPENROUTER_MODEL")
+        self.provider = provider                # e.g. "Groq": route only there, no fallbacks
+        self.max_spend_per_day = max_spend_per_day
+        self.tokens = {"in": 0, "cached": 0, "out": 0, "cost": 0.0}
         if not self.key or not self.model:
             raise RuntimeError("set OPENROUTER_KEY and OPENROUTER_MODEL (environment or .env)")
         self.max_requests, self.max_per_day = max_requests, max_per_day
@@ -63,9 +73,19 @@ class Client:
         self.log_dir = Path(log_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
+    @classmethod
+    def groq(cls, **kw):
+        """gpt-oss-120b served by Groq: ~350 tokens/s, $0.15/M in ($0.075 cached), $0.60/M out."""
+        kw.setdefault("min_interval", 0.3)
+        kw.setdefault("max_per_day", 5000)
+        return cls(model="openai/gpt-oss-120b", provider="Groq", **kw)
+
     # ---- logging
     def _log(self, status, body, text="", secs=0.0, usage=None):
         prompt = body["messages"][-1]["content"]
+        u = usage or {}
+        cached = (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0) or 0
+        tok = f" in {cached}/{u['prompt_tokens']} cached, out {u.get('completion_tokens')}" if u else ""
         with open(self.log_dir / "calls.jsonl", "a") as f:
             f.write(json.dumps({"t": time.strftime("%Y-%m-%d %H:%M:%S"), "status": status,
                                 "model": body["model"], "secs": round(secs, 1), "usage": usage,
@@ -73,7 +93,7 @@ class Client:
         one = lambda x, n: " ".join(str(x).split())[:n]
         with open(self.log_dir / "live.log", "a") as f:
             f.write(f"{time.strftime('%H:%M:%S')} {status:7s} {secs:5.1f}s "
-                    f"req {self.requests:3d}  prompt: {one(prompt.split(chr(10))[1] if chr(10) in prompt else prompt, 60)}"
+                    f"req {self.requests:3d}{tok}  prompt: {one(prompt, 60)}"
                     f"  ->  {one(text, 160)}\n")
 
     # ---- accounting
@@ -84,10 +104,14 @@ class Client:
             u = {}
         return u
 
-    def _count(self):
+    def _count(self, cost=0.0):
+        """One request (cost=0) or the dollars a finished request cost."""
         u = self._usage()
         today = date.today().isoformat()
-        u[today] = u.get(today, 0) + 1
+        if cost:
+            u["$" + today] = round(u.get("$" + today, 0.0) + cost, 6)
+        else:
+            u[today] = u.get(today, 0) + 1
         self.usage_file.write_text(json.dumps(u, indent=1))
 
     def _check_budget(self):
@@ -96,6 +120,9 @@ class Client:
         today = self._usage().get(date.today().isoformat(), 0)
         if today >= self.max_per_day:
             raise Budget(f"daily limit reached: {today} requests today (max_per_day={self.max_per_day})")
+        spent = self._usage().get("$" + date.today().isoformat(), 0.0)
+        if spent >= self.max_spend_per_day:
+            raise Budget(f"daily spend limit reached: ${spent:.2f} (max_spend_per_day={self.max_spend_per_day})")
 
     # ---- the call
     def _cache_path(self, body):
@@ -107,6 +134,8 @@ class Client:
              "max_tokens": max_tokens, **extra}
         if reasoning_effort:            # reasoning models: less hidden thinking, faster, cheaper
             b["reasoning"] = {"effort": reasoning_effort}
+        if self.provider:
+            b["provider"] = {"order": [self.provider], "allow_fallbacks": False}
         return b
 
     def forget(self, messages, **kw):
@@ -162,6 +191,14 @@ class Client:
             self._fail(body, "gave up after 6 attempts", time.time() - t0)
             raise RuntimeError("openrouter: gave up after 6 attempts")
         text = resp["choices"][0]["message"].get("content") or ""
+        u = resp.get("usage") or {}
+        cost = float(u.get("cost") or 0.0)
+        self.tokens["in"] += u.get("prompt_tokens", 0) or 0
+        self.tokens["cached"] += (u.get("prompt_tokens_details") or {}).get("cached_tokens", 0) or 0
+        self.tokens["out"] += u.get("completion_tokens", 0) or 0
+        self.tokens["cost"] += cost
+        if cost:
+            self._count(cost)
         hit.write_text(json.dumps({"body": body, "text": text, "usage": resp.get("usage")}))
         self._log("ok", body, text, time.time() - t0, resp.get("usage"))
         return text
@@ -171,6 +208,12 @@ class Client:
         self.errors_in_a_row += 1
         if self.errors_in_a_row >= self.max_consecutive_errors:
             raise Budget(f"{self.errors_in_a_row} failed calls in a row; stopping")
+
+    def summary(self):
+        t = self.tokens
+        share = t["cached"] / t["in"] if t["in"] else 0.0
+        return (f"{self.requests} requests, {self.cache_hits} from disk cache; tokens in {t['in']} "
+                f"({share:.0%} provider-cached), out {t['out']}; ${t['cost']:.4f}")
 
     def json_list(self, prompt, system=None, **kw):
         """Ask for a JSON array; returns the parsed list, or [] if the reply isn't one."""

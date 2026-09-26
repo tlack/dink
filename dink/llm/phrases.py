@@ -38,18 +38,25 @@ PERSONAS = [
     "someone joking around",
 ]
 
-COMMON = """Write {n} different things {persona} might say to a smart home voice assistant.
-{task}
+# Static instructions first (the system message), so providers can cache them as a prefix;
+# the part that changes per call (speaker, meaning, room rule) goes last, in the user message.
+SYSTEM = """You write training data for a smart home voice assistant: things people say to it.
+Each request tells you who is speaking and what they mean; write {n} different things that
+speaker might say with exactly that meaning.
 
 Variety matters more than anything. Mix:
 - everyday synonyms and nicknames for the device and the room, not just the obvious word
 - softened, negated or comparative wording ("not so ...", "less ...", "a notch ...", "tone down ...")
 - complaints or descriptions of how the speaker feels, when they clearly imply the request
 - different sentence shapes: commands, questions, fragments, "i need ...", "can we ..."
-Rules: {rules}
-lowercase, under 60 characters each, no quotes, no numbering, no digits.
+- lowercase, under 60 characters each, no quotes, no numbering, no digits
+- follow the room rule given with the request
 Reply with only a JSON array of objects: {{"t": "<what they say>", "room": true or false}}
 where room says whether the sentence names or clearly refers to a specific room."""
+
+USER = """Speaker: {persona}
+Meaning: {task}
+Room rule: {rules}"""
 
 
 def seeds(rng, repeats=3):
@@ -135,17 +142,21 @@ def main():
     ap.add_argument("--max-requests", type=int, default=20)
     ap.add_argument("--per-seed", type=int, default=30)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--groq", action="store_true", help="gpt-oss-120b on Groq instead of OPENROUTER_MODEL")
+    ap.add_argument("--out", default=str(OUT))
     a = ap.parse_args()
-    c = Client(max_requests=a.max_requests)
+    c = Client.groq(max_requests=a.max_requests) if a.groq else Client(max_requests=a.max_requests)
+    out = Path(a.out)
     rng = random.Random(a.seed)
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text("")
+    system = SYSTEM.format(n=a.per_seed)
     seen, n_rows, bad, empty_in_a_row = set(), 0, 0, 0
     for i, s in enumerate(seeds(rng)):
         persona = PERSONAS[i % len(PERSONAS)]
-        prompt = COMMON.format(n=a.per_seed, persona=persona, task=s["task"], rules=s["rules"])
+        prompt = USER.format(persona=persona, task=s["task"], rules=s["rules"])
         try:
-            items = c.json_list(prompt, max_tokens=4000)
+            items = c.json_list(prompt, system=system, max_tokens=4000)
         except (Budget, RuntimeError) as e:
             print(f"stopping: {e}")
             break
@@ -161,7 +172,7 @@ def main():
             seen.add(t)
             named = bool(it.get("room")) and s["type"] not in ("lock", "scene", "question", "offdomain")
             new.append({"text": t, "key": key_of(s, named), "persona": persona, "model": c.model})
-        with open(OUT, "a") as f:
+        with open(out, "a") as f:
             f.write("".join(json.dumps(r) + "\n" for r in new))
         n_rows += len(new)
         print(f"[{i}] {s['type']:9s} {json.dumps(key_of(s, True)):40s} +{len(new):3d}  ({persona})", flush=True)
@@ -169,8 +180,7 @@ def main():
         if empty_in_a_row >= 5:
             print("stopping: 5 seeds in a row gave nothing usable (check data/llm/live.log)")
             break
-    print(f"{n_rows} phrasings from {c.requests} new requests + {c.cache_hits} cached; "
-          f"{bad} dropped items -> {OUT}")
+    print(f"{n_rows} phrasings, {bad} dropped items -> {out}\n{c.summary()}")
 
 
 if __name__ == "__main__":
