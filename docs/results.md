@@ -223,3 +223,40 @@ state and action names already carry the context (`chamber_temperature_celsius`,
 
 Decision: scenarios off. The code stays (`--scenario`, off by default) and costs nothing
 unless enabled. No LLM spend was involved.
+
+## 2026-09-26: inverter (contrast variants)
+
+`dink/llm/invert.py`: for each validated request of 7 kinds (direct, a bit, a lot,
+complaint, desire, slang, no-value), three variants that keep the key words:
+- opposite direction;
+- complaint <-> desire reframe ("it's too cold" <-> "i want it cold");
+- negation, which always means "none".
+
+A second call labels the variants independently. Results:
+- 19,380 variants, 94% agree, $1.75 for all 1,000 worlds;
+- 31k scenarios after the code checks, 18k of them in training (7.4k negate, 6.0k reframe,
+  4.8k opposite).
+
+`all_inv` uses the same settings as all_worlds (20k steps, split_v6 = split_v5 + inverted
+variants, same holdouts). Both models are scored on split_v6's test sets, which now include
+unseen inverted variants. 30 thermal pauses.
+
+| set | all_worlds | all_inv |
+|---|---|---|
+| test_areas (unseen areas) | 0.874 | **0.896** |
+| test_worlds (unseen settings) | 0.880 | **0.900** |
+| test_templates | 0.902 | 0.934 |
+| test_styles | 0.904 | 0.954 |
+| test_words | 0.852 | 0.864 |
+| test_llm | 0.852 | 0.838 |
+| hard cases | 21/28 | **25/28** |
+
+Readings:
+- Framing is mostly fixed. "i want it cold in here" -> cooler now works in both name
+  styles, as does "make it super bright" -> full.
+- Unseen areas by kind: complaint 0.73 -> 0.80, desire 0.78 -> 0.83, slang 0.81 -> 0.90,
+  negations 1.00, opposite / reframe variants 0.80.
+- Still wrong: "hot as hell" under-scales (+1 to +3 instead of +6), and "make it really dark"
+  (long names) now flips back to lights on. It had been right in all_worlds, so this one case
+  is unstable between runs.
+- test_llm dips 0.014. That's within seed noise; watch it.
