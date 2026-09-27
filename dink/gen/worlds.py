@@ -37,6 +37,11 @@ from ..data.numbers import extract
 from ..data.scenario import MAX_SLOTS, Field, Scenario
 from . import names as N
 from .bank import annotate
+from .ordinal import offer, right as ranked
+
+# Relative requests whose strength picks among the offered options by rank (dink/gen/ordinal.py)
+ORDINAL = {"relative_small": "small", "relative_big": "big", "int_small": "small", "int_plain": "plain",
+           "int_big": "big", "int_max": "max"}
 
 SRC = Path("data/llm/worlds.jsonl")
 UP = {"warmer", "hotter", "higher", "faster", "brighter", "stronger", "louder", "more", "increase", "raise",
@@ -220,7 +225,7 @@ def candidates(a, cur, target, rng):
 def scenario(world, u, rng, style):
     acts = {a["name"]: a for a in world["actions"]}
     st = state_for(world, u)
-    tools, target_i = [], None
+    tools, rights = [], []
     right = acts.get(u["action"])
 
     def add(a, v):
@@ -230,14 +235,26 @@ def scenario(world, u, rng, style):
         else:
             tools.append(Field(nm, v, a["lo"], a["hi"]))
 
-    if right is not None:
+    cur_right = st.get(right["sets"], {}).get("value") if right is not None and right.get("sets") else None
+    if right is not None and u["kind"] in ORDINAL and right["lo"] is not None and cur_right is not None \
+            and abs(u["value"] - cur_right) > 1e-9:
+        # strength picks by rank among coarse offered values; several can be right
+        up = u["value"] > cur_right
+        moves = offer(cur_right, right["lo"], right["hi"], up, rng, whole=right.get("int", False))
+        back = offer(cur_right, right["lo"], right["hi"], not up, rng, whole=right.get("int", False))
+        for v in moves + back[:rng.randint(0, 1)]:
+            add(right, v)
+        rights = ranked(len(moves), ORDINAL[u["kind"]])
+        if not rights:
+            return None
+    elif right is not None:
         target_v = None if right["lo"] is None else rnd(u["value"], right)
         if target_v is not None and abs(target_v - u["value"]) > 1e-9:
             return None                          # a fractional value on a range we round to whole steps
         add(right, target_v)
-        target_i = 0
+        rights = [0]
         if right["lo"] is not None:
-            cur = st.get(right["sets"], {}).get("value") if right["sets"] else None
+            cur = cur_right
             if u.get("ladder"):                  # intensity: the other strengths are the decoys
                 decoys = [v for v in dict.fromkeys(u["ladder"].values()) if v != target_v]
                 plain = u["ladder"]["plain"]
@@ -266,7 +283,10 @@ def scenario(world, u, rng, style):
     rng.shuffle(order)
     tools = [tools[i] for i in order]
     target = [0.0] * (len(tools) + 1)
-    target[order.index(target_i) if target_i is not None else len(tools)] = 1.0
+    for i in rights:
+        target[order.index(i)] = 1.0 / len(rights)
+    if not rights:
+        target[len(tools)] = 1.0
     state = [Field(restyle(f["name"], style), f["value"], f["lo"], f["hi"]) for f in st.values()][:MAX_SLOTS]
     rng.shuffle(state)
     needed = [restyle(n, style) for n in ([right["sets"]] if right is not None and right.get("sets") else [])

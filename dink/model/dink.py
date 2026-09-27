@@ -42,14 +42,16 @@ def ple_signed(x, edges=REL_EDGES):
 
 
 class Dink(nn.Module):
-    def __init__(self, width=128, dim=64, blocks=2, heads=4, ff=256, dropout=0.1, scenario=False):
+    def __init__(self, width=128, dim=64, blocks=2, heads=4, ff=256, dropout=0.1, scenario=False,
+                 raw_magnitude=True):
         super().__init__()
         self.use_scenario = scenario
+        self.raw = raw_magnitude                # False: values enter only as their 0..1 position
         self.text = TextEncoder(width=width, out=dim, queries=PROMPT_TOKENS,
                                 max_len=SCENARIO_BYTES if scenario else 64)
         if scenario:
             self.scenario_role = nn.Parameter(torch.randn(dim) * 0.02)
-        self.fuse = Fuse(dim=dim)
+        self.fuse = Fuse(dim=dim, n_feats=18 if raw_magnitude else 17)
         self.role = nn.Embedding(3, dim)                       # state, prompt, tool
         self.nothing = nn.Parameter(torch.randn(dim) * 0.02)
         self.rel_q = nn.Linear(dim, dim, bias=False)
@@ -75,7 +77,12 @@ class Dink(nn.Module):
         with torch.no_grad():
             self.text.query.copy_(q.repeat(PROMPT_TOKENS, 1) + 0.01 * torch.randn_like(self.text.query))
         if ck.get("fuse"):
-            self.fuse.load_state_dict(ck["fuse"])
+            fs = dict(ck["fuse"])
+            w = fs["net.0.weight"]
+            if w.shape[1] == self.fuse.net[0].in_features + 1:      # drop the raw-magnitude input
+                mag = w.shape[1] - 2                                  # [name 64 | 16 bins | mag | has]
+                fs["net.0.weight"] = torch.cat([w[:, :mag], w[:, mag + 1:]], 1)
+            self.fuse.load_state_dict(fs)
 
     def names(self, b):
         """[N, 8, L] name bytes -> [N, 8, dim] (one vector per name: pooling query 0)."""
@@ -84,8 +91,8 @@ class Dink(nn.Module):
 
     def forward(self, x):
         state_name, tool_name = self.names(x["state_name"]), self.names(x["tool_name"])
-        sv = value_features(x["state_val"], x["state_lo"], x["state_hi"])
-        tv = value_features(x["tool_val"], x["tool_lo"], x["tool_hi"], x["tool_arg"])
+        sv = value_features(x["state_val"], x["state_lo"], x["state_hi"], raw=self.raw)
+        tv = value_features(x["tool_val"], x["tool_lo"], x["tool_hi"], x["tool_arg"], raw=self.raw)
         state = self.fuse(state_name, sv) + self.role.weight[0]
         tool = self.fuse(tool_name, tv) + self.role.weight[1]
 

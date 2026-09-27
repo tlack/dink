@@ -173,6 +173,8 @@ def main():
     ap.add_argument("--no-state", type=float, default=0.0,
                     help="share of state-free training draws with the whole state removed (dink/evals/nostate.py)")
     ap.add_argument("--extra-test", nargs="*", default=[], help="more test files, scored as test sets")
+    ap.add_argument("--raw-magnitude", action="store_true",
+                    help="also feed the raw value's log magnitude (the first models did; off since 2026-09-27)")
     ap.add_argument("--mix", default=None, help='per-source batch shares, e.g. "home=0.4,world=0.45,ha=0.15"')
     ap.add_argument("--also", default=None,
                     help="another split (same holdouts) whose test sets are scored too, as old:<set>")
@@ -206,7 +208,7 @@ def main():
     if mix:
         have = collections.Counter(source_of(s) for s in train)
         print("mix:", {k: f"{v:.2f} of batches ({have[k]} rows)" for k, v in mix.items()}, flush=True)
-    model = Dink(width=a.width, scenario=a.scenario)
+    model = Dink(width=a.width, scenario=a.scenario, raw_magnitude=a.raw_magnitude)
     if a.init == "distilled":
         model.load_distilled(a.ckpt)
     model.to(a.device)

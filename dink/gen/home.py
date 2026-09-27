@@ -11,6 +11,7 @@ from dataclasses import dataclass, field, replace
 
 from ..data.scenario import MAX_SLOTS, PROMPT_BYTES, Field, Scenario
 from . import names as N
+from .ordinal import offer, right
 
 
 # ---------------------------------------------------------------- configuration
@@ -190,6 +191,9 @@ QUESTIONS = ["is the {dev} locked", "are the {room}{dev} on",
 
 
 # ---------------------------------------------------------------- building blocks
+STRENGTH = {"small": "small", "default": "plain", "big": "big"}   # generator intensity -> ordinal strength
+
+
 def candidate_values(kind: Kind, cur, rng, want=None):
     """What a device harness would offer for a numeric tool: a spread of values around
     the current one and across the range (never the current value itself)."""
@@ -454,14 +458,7 @@ class HomeGen:
             self._movable(x, up, at_limit=force_limit)
         must, target, needed = [], {}, []
         for x in cands:
-            want = x.value + direction * x.kobj.steps[intensity]
-            vals = candidate_values(x.kobj, x.value, rng)
-            best = best_move(vals, x.value, want, direction)
-            keep = self._subset(vals, best, x.value, rng)
-            base = len(must)
-            must += self.tools_for(x, style, keep)
-            if best is not None:
-                target[base + keep.index(best)] = 1.0
+            self._ordinal(x, up, STRENGTH[intensity], style, must, target)
             needed.append(x)
         others = [x for x in devs if x not in cands]
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, needed, occ)
@@ -472,10 +469,24 @@ class HomeGen:
         cls = "limit" if force_limit else ("relative_" + intensity)
         s = self.finish(intent, cls, tools, state, target, prompt, chunks,
                         room=",".join(sorted({x.room for x in cands})) or d.room,
-                        ambiguous=len(target) > 1, needed=[x.canon for x in needed])
+                        ambiguous=len(cands) > 1, needed=[x.canon for x in needed])
         if s:
             s.meta["dir"] = direction
         return s
+
+    def _ordinal(self, x, up, strength, style, must, target):
+        """Offer coarse values for a relative request and mark the right ones by rank
+        (dink/gen/ordinal.py); a device at its limit gets only moves the other way."""
+        k, rng = x.kobj, self.rng
+        moves = offer(x.value, k.lo, k.hi, up, rng, whole=k.integer)
+        back = offer(x.value, k.lo, k.hi, not up, rng, whole=k.integer)
+        keep = moves + back[:rng.randint(0, 1) if moves else rng.randint(1, 2)]
+        if not keep:
+            return
+        base = len(must)
+        must += self.tools_for(x, style, keep)
+        for i in right(len(moves), strength):
+            target[base + i] = 1.0
 
     def _movable(self, x, up, at_limit=False):
         """Put a device at its limit in the asked direction, or make sure it can move."""
@@ -541,21 +552,14 @@ class HomeGen:
             self._movable(x, up)
         must, target = [], {}
         for x in cands:
-            want = x.value + direction * x.kobj.steps[intensity]
-            vals = candidate_values(x.kobj, x.value, rng)
-            best = best_move(vals, x.value, want, direction)
-            keep = self._subset(vals, best, x.value, rng)
-            base = len(must)
-            must += self.tools_for(x, style, keep)
-            if best is not None:
-                target[base + keep.index(best)] = 1.0
+            self._ordinal(x, up, STRENGTH[intensity], style, must, target)
         others = [x for x in devs if x not in cands]
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, cands, occ)
         prompt, chunks = self.from_bank("indirect", d.kind, direction, intensity, d.room if mention else None) \
             or self.render(text, room_code=d.room, mention_room=mention)
         s = self.finish(intent, "indirect_" + intensity, tools, state, target, prompt, chunks,
                         room=",".join(sorted({x.room for x in cands})) or d.room,
-                        ambiguous=len(target) > 1, needed=[x.canon for x in cands])
+                        ambiguous=len(cands) > 1, needed=[x.canon for x in cands])
         if s:
             s.meta["dir"] = direction
         return s

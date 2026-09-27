@@ -108,3 +108,25 @@ def test_bank_phrases_are_annotated_and_held_out():
     for s in sets["train"] + sets["val"]:
         assert "shut it all down" not in s.prompt
     assert sets.get("test_llm")
+
+
+def test_relative_requests_are_ranked(pool):
+    """Ordinal strength (dink/gen/ordinal.py): 'a bit' = the smallest move offered in the
+    asked direction, 'a lot' = the biggest is always among the right answers."""
+    checked = 0
+    for s in pool:
+        cls = s.meta["cls"]
+        if cls not in ("relative_small", "relative_big") or s.meta["ambiguous"] or s.label == len(s.tools):
+            continue
+        t = s.tools[s.label]
+        room, kind = split_name(t.name)
+        cur = {f.name: f.value for f in s.state}[N.state(s.meta["uses"]["style"], room, kind)]
+        d = s.meta["dir"]
+        moves = sorted(abs(u.value - cur) for u in s.tools if u.name == t.name and (u.value - cur) * d > 0)
+        right = [abs(u.value - cur) for u, w in zip(s.tools, s.target) if w > 0]
+        if cls == "relative_small":
+            assert right == [moves[0]], s.show()
+        else:
+            assert moves[-1] in right, s.show()
+        checked += 1
+    assert checked > 200
