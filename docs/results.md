@@ -332,3 +332,43 @@ Readings:
   test_llm 0.858 -> 0.836 -> 0.820, test_words 0.876 -> 0.864 -> 0.850. The smart home is
   now 26% of training. It needs balancing (sampling weights per source) or more smart-home
   phrasing data.
+
+## 2026-09-27: intensity ladder + per-source balancing, 40k steps
+
+`dink/llm/intensity.py`: the LLM writes phrasings at four strengths per device and direction;
+code sets the values (8% / 20% / 45% of the range / the end); an independent judge must agree
+on each phrasing's strength.
+- 28,480 phrasings over 1,000 worlds and 24 smart-home rooms, 98.5% agree, $1.30;
+- 55.7k scenarios, whose decoys are the other strengths.
+
+`all_v9`: split_v9 (= v8 + intensity), 40k steps, `--mix home=0.4,world=0.45,ha=0.15`,
+`--no-state 0.3`. 244 thermal pauses, 93 min paused, 2.5 h in total (fan pinned).
+
+| set (split_v9 tests) | all_v8 | all_v9 |
+|---|---|---|
+| test_areas | 0.786 | **0.910** |
+| test_worlds | 0.836 | **0.890** |
+| test_words (smart home) | 0.802 | **0.876** |
+| test_llm (smart home) | 0.836 | 0.856 |
+| test_templates | 0.902 | 0.944 |
+| test_styles | 0.862 | 0.958 |
+| test_indist | 0.876 | 0.980 |
+| test_nostate | 0.957 | 0.958 |
+| test_ha | 0.956 | 0.967 |
+| test_ha_unseen | 0.780 | 0.725 (n=91) |
+| old:test_words / old:test_llm (split_v3 sets) | 0.834 / 0.826 | 0.876 / 0.852 |
+| hard cases | 27/32 | 27/32 |
+
+Readings:
+- Balancing stopped the smart-home slide and reversed it (words 0.80 -> 0.88).
+- Intensity on unseen areas: small 0.96, plain 0.96, big 0.93, max 1.00.
+- But the smart-home intensity hard cases still fail, for two reasons found by probing:
+  1. The model learned exact amounts. "make it way warmer" -> 76 is right, but "make it as
+     hot as it goes" with the end (85) not offered -> 73, or 67 with 27%. In training, "max"
+     always had the end on offer, so the model has no rule for "most extreme option offered".
+  2. Sources disagree on what "a lot" means: the generator uses +6 F on a thermostat (24%)
+     and +60% on lights, the LLM worlds prompts 30-60%, the intensity ladder 45%. "super
+     bright" from 0.3 -> 0.6, the nearest to the ladder's 0.75; the hard case, on the
+     generator's scale, expects 1.
+- The gate case {0, 0.5} failed this run (0.5 for "close"); it's unstable across runs.
+- test_ha_unseen dips on only 91 sentences.
