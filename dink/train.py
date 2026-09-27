@@ -53,12 +53,20 @@ def is_nothing(s):
 class Batches(torch.utils.data.IterableDataset):
     """Endless augmented, collated batches; each worker has its own random stream."""
 
-    def __init__(self, train, batch, seed, scenario_drop=0.0, no_state=0.0):
+    def __init__(self, train, batch, seed, scenario_drop=0.0, no_state=0.0, mix=None):
         self.train, self.batch, self.seed, self.scenario_drop = train, batch, seed, scenario_drop
         self.no_state = no_state
+        self.groups, self.weights = None, None
+        if mix:                                 # fixed share of each batch per source
+            by = collections.defaultdict(list)
+            for s in train:
+                by[source_of(s)].append(s)
+            self.groups = [by[k] for k in mix if by[k]]
+            self.weights = [mix[k] for k in mix if by[k]]
 
     def draw(self, rng):
-        s = A.augment(rng.choice(self.train), rng)
+        pool = rng.choices(self.groups, self.weights)[0] if self.groups else self.train
+        s = A.augment(rng.choice(pool), rng)
         if self.no_state and s.state and state_free(s) and rng.random() < self.no_state:
             s = strip_state(s)                  # prompt-only: only where the answer can't depend on state
         if s.scenario and rng.random() < self.scenario_drop:     # the model must work without one too
@@ -70,6 +78,12 @@ class Batches(torch.utils.data.IterableDataset):
         rng = random.Random(self.seed * 1000 + (info.id if info else 0))
         while True:
             yield collate([self.draw(rng) for _ in range(self.batch)])
+
+
+def source_of(s):
+    """Data source, for --mix: the smart home generator, LLM worlds, or Home Assistant."""
+    intent = s.meta.get("intent")
+    return "ha" if intent == "ha" else "world" if intent == "world" else "home"
 
 
 def to(x, dev):
@@ -159,6 +173,7 @@ def main():
     ap.add_argument("--no-state", type=float, default=0.0,
                     help="share of state-free training draws with the whole state removed (dink/evals/nostate.py)")
     ap.add_argument("--extra-test", nargs="*", default=[], help="more test files, scored as test sets")
+    ap.add_argument("--mix", default=None, help='per-source batch shares, e.g. "home=0.4,world=0.45,ha=0.15"')
     ap.add_argument("--also", default=None,
                     help="another split (same holdouts) whose test sets are scored too, as old:<set>")
     ap.add_argument("--resume", action="store_true", help="continue from runs/dink/<name>/ckpt.pt")
@@ -187,6 +202,10 @@ def main():
             for s in items:
                 st.fill(s, srng)
 
+    mix = {k: float(v) for k, v in (kv.split("=") for kv in a.mix.split(","))} if a.mix else None
+    if mix:
+        have = collections.Counter(source_of(s) for s in train)
+        print("mix:", {k: f"{v:.2f} of batches ({have[k]} rows)" for k, v in mix.items()}, flush=True)
     model = Dink(width=a.width, scenario=a.scenario)
     if a.init == "distilled":
         model.load_distilled(a.ckpt)
@@ -219,7 +238,7 @@ def main():
         print(f"resumed at step {start}", flush=True)
     loader = iter(torch.utils.data.DataLoader(Batches(train, a.batch, a.seed + start,
                                                                       a.scenario_drop if a.scenario else 0.0,
-                                                                      a.no_state), batch_size=None,
+                                                                      a.no_state, mix), batch_size=None,
                                               num_workers=a.workers, pin_memory=a.device != "cpu",
                                               persistent_workers=a.workers > 0))
     t0 = time.time()

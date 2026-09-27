@@ -99,7 +99,7 @@ def problems(world, u, parent=None):
     a = acts.get(u["action"])
     if u["action"] != "none" and a is None:
         return ["unknown action"]
-    if u["source"] in ("request", "same", "invert") and not u.get("agree"):
+    if u["source"] in ("request", "same", "invert", "intensity") and not u.get("agree"):
         out.append("replay disagrees")
     if a is not None and a["lo"] is not None and u["kind"] in ("number", "direct"):
         said = [v for v, k in extract(u["say"]) if k == "raw" and a["lo"] <= v <= a["hi"]]
@@ -238,7 +238,16 @@ def scenario(world, u, rng, style):
         target_i = 0
         if right["lo"] is not None:
             cur = st.get(right["sets"], {}).get("value") if right["sets"] else None
-            for v in candidates(right, cur, target_v, rng)[:rng.randint(1, 3)]:
+            if u.get("ladder"):                  # intensity: the other strengths are the decoys
+                decoys = [v for v in dict.fromkeys(u["ladder"].values()) if v != target_v]
+                plain = u["ladder"]["plain"]
+                if cur is not None and right["lo"] <= 2 * cur - plain <= right["hi"]:
+                    decoys.append(rnd(2 * cur - plain, right))       # the opposite direction
+                rng.shuffle(decoys)
+                decoys = decoys[:rng.randint(2, 3)]
+            else:
+                decoys = candidates(right, cur, target_v, rng)[:rng.randint(1, 3)]
+            for v in decoys:
                 add(right, v)
     others = [a for a in world["actions"] if a is not right]
     rng.shuffle(others)
