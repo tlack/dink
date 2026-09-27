@@ -37,7 +37,7 @@ from ..data.numbers import extract
 from ..data.scenario import MAX_SLOTS, Field, Scenario
 from . import names as N
 from .bank import annotate
-from .ordinal import offer, right as ranked
+from .ordinal import offer, weights as graded
 
 # Relative requests whose strength picks among the offered options by rank (dink/gen/ordinal.py)
 ORDINAL = {"relative_small": "small", "relative_big": "big", "int_small": "small", "int_plain": "plain",
@@ -225,7 +225,7 @@ def candidates(a, cur, target, rng):
 def scenario(world, u, rng, style):
     acts = {a["name"]: a for a in world["actions"]}
     st = state_for(world, u)
-    tools, rights = [], []
+    tools, rights = [], {}                      # tool index -> weight (graded right answers)
     right = acts.get(u["action"])
 
     def add(a, v):
@@ -244,7 +244,7 @@ def scenario(world, u, rng, style):
         back = offer(cur_right, right["lo"], right["hi"], not up, rng, whole=right.get("int", False))
         for v in moves + back[:rng.randint(0, 1)]:
             add(right, v)
-        rights = ranked(len(moves), ORDINAL[u["kind"]])
+        rights = graded(moves, cur_right, right["lo"], right["hi"], up, ORDINAL[u["kind"]])
         if not rights:
             return None
     elif right is not None:
@@ -252,7 +252,7 @@ def scenario(world, u, rng, style):
         if target_v is not None and abs(target_v - u["value"]) > 1e-9:
             return None                          # a fractional value on a range we round to whole steps
         add(right, target_v)
-        rights = [0]
+        rights = {0: 1.0}
         if right["lo"] is not None:
             cur = cur_right
             if u.get("ladder"):                  # intensity: the other strengths are the decoys
@@ -283,8 +283,9 @@ def scenario(world, u, rng, style):
     rng.shuffle(order)
     tools = [tools[i] for i in order]
     target = [0.0] * (len(tools) + 1)
-    for i in rights:
-        target[order.index(i)] = 1.0 / len(rights)
+    total = sum(rights.values())
+    for i, w in rights.items():
+        target[order.index(i)] = w / total
     if not rights:
         target[len(tools)] = 1.0
     state = [Field(restyle(f["name"], style), f["value"], f["lo"], f["hi"]) for f in st.values()][:MAX_SLOTS]

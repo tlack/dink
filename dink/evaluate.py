@@ -22,7 +22,7 @@ def main():
     model = Dink(width=ck["args"]["width"], scenario=ck["args"].get("scenario", False),
                  raw_magnitude=ck["args"].get("raw_magnitude", True)).to(a.device)
     model.load_state_dict(ck["state"])
-    print(f"{'set':16s} {'acc':>6s} {'p(right)':>9s} {'nothing P/R':>12s}")
+    print(f"{'set':16s} {'best':>6s} {'ok':>6s} {'p(right)':>9s} {'nothing P/R':>12s}")
     fill = None
     if model.use_scenario:
         import random
@@ -34,7 +34,8 @@ def main():
         if fill:
             fill(items)
         r = evaluate(model, items)
-        print(f"{p.stem:16s} {r['acc']:6.3f} {r['p_right']:9.3f} {r['nothing_precision']:6.2f}/{r['nothing_recall']:.2f}")
+        print(f"{p.stem:16s} {r['acc']:6.3f} {r['ok']:6.3f} {r['p_right']:9.3f} "
+              f"{r['nothing_precision']:6.2f}/{r['nothing_recall']:.2f}")
 
 
 if __name__ == "__main__":

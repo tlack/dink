@@ -11,7 +11,7 @@ from dataclasses import dataclass, field, replace
 
 from ..data.scenario import MAX_SLOTS, PROMPT_BYTES, Field, Scenario
 from . import names as N
-from .ordinal import offer, right
+from .ordinal import offer, weights
 
 
 # ---------------------------------------------------------------- configuration
@@ -485,8 +485,8 @@ class HomeGen:
             return
         base = len(must)
         must += self.tools_for(x, style, keep)
-        for i in right(len(moves), strength):
-            target[base + i] = 1.0
+        for i, w in weights(moves, x.value, k.lo, k.hi, up, strength).items():
+            target[base + i] = w                # graded: the best fit 1, other acceptable 0.5
 
     def _movable(self, x, up, at_limit=False):
         """Put a device at its limit in the asked direction, or make sure it can move."""

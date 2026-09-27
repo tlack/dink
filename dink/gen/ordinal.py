@@ -49,6 +49,20 @@ def offer(cur, lo, hi, up, rng, whole=False):
     return sorted(out, key=lambda v: abs(v - cur))
 
 
+IDEAL = {"small": 0.15, "plain": 0.35, "big": 0.6, "max": 1.0}      # share of the room left
+
+
+def weights(moves, cur, lo, hi, up, strength):
+    """Graded right answers {index: weight}: of the acceptable options (right()), the one
+    nearest the strength's ideal amount weighs 1, the others 0.5; everything else 0."""
+    ok = right(len(moves), strength)
+    if not ok:
+        return {}
+    room = max((hi - cur) if up else (cur - lo), 1e-9)
+    best = min(ok, key=lambda i: abs(abs(moves[i] - cur) / room - IDEAL[strength]))
+    return {i: 1.0 if i == best else 0.5 for i in ok}
+
+
 def right(n, strength):
     """Indices (0 = smallest move) that count as right for a strength, among n offered moves."""
     if n == 0:

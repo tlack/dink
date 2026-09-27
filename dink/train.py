@@ -80,6 +80,16 @@ class Batches(torch.utils.data.IterableDataset):
             yield collate([self.draw(rng) for _ in range(self.batch)])
 
 
+def rank_loss(logits, target, margin=1.0):
+    """Pairwise ranking over graded targets: for every pair where option i is more right than
+    option j, softplus(margin - (z_i - z_j)), weighted by how much more right. A near-miss
+    between two acceptable answers costs little; ranking a wrong one high costs a lot."""
+    diff = target[:, :, None] - target[:, None, :]              # [B, i, j] > 0: i better than j
+    gap = logits[:, :, None] - logits[:, None, :]
+    w = diff.clamp(min=0)
+    return (w * F.softplus(margin - gap)).sum((1, 2)).div(w.sum((1, 2)).clamp(min=1e-9)).mean()
+
+
 def source_of(s):
     """Data source, for --mix: the smart home generator, LLM worlds, or Home Assistant."""
     intent = s.meta.get("intent")
@@ -124,7 +134,7 @@ def evaluate(model, items, batch=256):
     """Accuracy (a pick is right if it is one of the best answers), nothing-relevant
     precision / recall, accuracy per request class, mean probability of the right answer."""
     model.eval()
-    ok = tp = fp = fn = 0
+    ok = good = tp = fp = fn = 0
     per = collections.defaultdict(lambda: [0, 0])
     p_right = 0.0
     for i in range(0, len(items), batch):
@@ -133,8 +143,9 @@ def evaluate(model, items, batch=256):
         prob = model(to(x, next(model.parameters()).device)).softmax(-1).cpu()
         pred = prob.argmax(-1)
         for s, p, pr, t in zip(chunk, pred.tolist(), prob, x["target"]):
-            right = bool(t[p] >= t.max() - 1e-6)
+            right = bool(t[p] >= t.max() - 1e-6)      # the best answer (or one of equally best)
             ok += right
+            good += bool(t[p] > 0)                   # acceptable: not clearly wrong
             per[s.meta["cls"]][0] += right
             per[s.meta["cls"]][1] += 1
             p_right += float((pr * t).sum())
@@ -143,7 +154,7 @@ def evaluate(model, items, batch=256):
             fp += said_nothing and not is_n
             fn += (not said_nothing) and is_n
     n = len(items)
-    return {"acc": ok / n, "p_right": p_right / n,
+    return {"acc": ok / n, "ok": good / n, "p_right": p_right / n,
             "nothing_precision": tp / max(1, tp + fp), "nothing_recall": tp / max(1, tp + fn),
             "by_class": {k: round(a / b, 3) for k, (a, b) in sorted(per.items())}, "n": n}
 
@@ -175,6 +186,8 @@ def main():
     ap.add_argument("--extra-test", nargs="*", default=[], help="more test files, scored as test sets")
     ap.add_argument("--raw-magnitude", action="store_true",
                     help="also feed the raw value's log magnitude (the first models did; off since 2026-09-27)")
+    ap.add_argument("--rank-loss", type=float, default=0.0,
+                    help="weight of the pairwise ranking loss: more-right options above less-right ones")
     ap.add_argument("--mix", default=None, help='per-source batch shares, e.g. "home=0.4,world=0.45,ha=0.15"')
     ap.add_argument("--also", default=None,
                     help="another split (same holdouts) whose test sets are scored too, as old:<set>")
@@ -249,8 +262,11 @@ def main():
             cool_down(a.gpu_hot, a.gpu_cool)
         model.train()
         x = to(next(loader), a.device)
-        logp = F.log_softmax(model(x), -1)
+        model_logits = model(x)
+        logp = F.log_softmax(model_logits, -1)
         loss = -(x["target"] * logp).sum(-1).mean()
+        if a.rank_loss:
+            loss = loss + a.rank_loss * rank_loss(model_logits, x["target"])
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -269,9 +285,10 @@ def main():
     results = {"val": evaluate(model, val)}
     for k, items in tests.items():
         results[k] = evaluate(model, items)
-    print(f"\n{'set':16s} {'acc':>6s} {'p(right)':>9s} {'nothing P/R':>12s}")
+    print(f"\n{'set':16s} {'best':>6s} {'ok':>6s} {'p(right)':>9s} {'nothing P/R':>12s}")
     for k, r in results.items():
-        print(f"{k:16s} {r['acc']:6.3f} {r['p_right']:9.3f} {r['nothing_precision']:6.2f}/{r['nothing_recall']:.2f}")
+        print(f"{k:16s} {r['acc']:6.3f} {r['ok']:6.3f} {r['p_right']:9.3f} "
+              f"{r['nothing_precision']:6.2f}/{r['nothing_recall']:.2f}")
     (out / "metrics.json").write_text(json.dumps({"args": vars(a), "params": n_params, "history": history,
                                                   "results": results}, indent=2))
     print("saved", out)
