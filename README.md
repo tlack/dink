@@ -111,6 +111,22 @@ Schema-Guided Dialogue (unseen services in its test split), MultiWOZ 2.2, Taskma
 API-Bank, APIBench, ToolBench, TaskBench, NESTFUL, When2Call, `acon96/Home-Assistant-Requests`,
 EB-ALFRED, Fluent Speech Commands, Mind2Web. Notes on fit are in PLAN.md ("Later ideas").
 
+## License
+
+The code in this repository is released under the [MIT license](LICENSE), copyright
+Thomas Lackner. The external data and models listed above keep their own licenses, and
+none of them are redistributed here.
+
+## AI authorship
+
+Dink was built by Thomas Lackner with heavy assistance from Claude Opus 5.5, Anthropic's AI
+model, working in Claude Code. Claude wrote most of the code, the data generators and
+converters, the LLM prompts and their validation, and the training and evaluation tooling;
+it ran the experiments and wrote up the results. Thomas set the direction and design,
+questioned results, tested the model by hand, and decided what to try next. Much of the
+training data is itself AI-generated (see "LLM-generated data" above), checked in code
+before use.
+
 ## Credentials
 
 `.env` (git-ignored) holds `OPENROUTER_KEY` and a default `OPENROUTER_MODEL`. The data jobs
