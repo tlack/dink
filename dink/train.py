@@ -25,6 +25,7 @@ import torch.nn.functional as F
 
 from .data.collate import collate
 from .data.scenario import Scenario
+from .evals.nostate import nostate_tests, state_free, strip_state
 from .gen import augment as A
 from .model.dink import SLOTS, Dink
 
@@ -52,11 +53,14 @@ def is_nothing(s):
 class Batches(torch.utils.data.IterableDataset):
     """Endless augmented, collated batches; each worker has its own random stream."""
 
-    def __init__(self, train, batch, seed, scenario_drop=0.0):
+    def __init__(self, train, batch, seed, scenario_drop=0.0, no_state=0.0):
         self.train, self.batch, self.seed, self.scenario_drop = train, batch, seed, scenario_drop
+        self.no_state = no_state
 
     def draw(self, rng):
         s = A.augment(rng.choice(self.train), rng)
+        if self.no_state and s.state and state_free(s) and rng.random() < self.no_state:
+            s = strip_state(s)                  # prompt-only: only where the answer can't depend on state
         if s.scenario and rng.random() < self.scenario_drop:     # the model must work without one too
             s = dataclasses.replace(s, scenario="")
         return s
@@ -152,6 +156,9 @@ def main():
     ap.add_argument("--scenario", action="store_true",
                     help="give the model each gadget's scenario description (dink/gen/scenario_text.py)")
     ap.add_argument("--scenario-drop", type=float, default=0.3, help="share of training draws without it")
+    ap.add_argument("--no-state", type=float, default=0.0,
+                    help="share of state-free training draws with the whole state removed (dink/evals/nostate.py)")
+    ap.add_argument("--extra-test", nargs="*", default=[], help="more test files, scored as test sets")
     ap.add_argument("--also", default=None,
                     help="another split (same holdouts) whose test sets are scored too, as old:<set>")
     ap.add_argument("--resume", action="store_true", help="continue from runs/dink/<name>/ckpt.pt")
@@ -166,6 +173,9 @@ def main():
     noise = [(A.asr_noise, 1.0), (A.typos, 1.0), (A.fillers, 0.5)]
     nrng = random.Random(123)
     tests["test_noise"] = [A.augment(s, nrng, noise) for s in tests["test_indist"]]
+    tests["test_nostate"] = nostate_tests(tests)
+    for p in a.extra_test:
+        tests[Path(p).stem] = load(p)
     from .evals.hard import cases
     tests["hard"] = cases()
     if a.also:
@@ -208,7 +218,8 @@ def main():
         history, start = ck["history"], ck["step"] + 1
         print(f"resumed at step {start}", flush=True)
     loader = iter(torch.utils.data.DataLoader(Batches(train, a.batch, a.seed + start,
-                                                                      a.scenario_drop if a.scenario else 0.0), batch_size=None,
+                                                                      a.scenario_drop if a.scenario else 0.0,
+                                                                      a.no_state), batch_size=None,
                                               num_workers=a.workers, pin_memory=a.device != "cpu",
                                               persistent_workers=a.workers > 0))
     t0 = time.time()
