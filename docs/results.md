@@ -297,3 +297,38 @@ Readings:
   *cooler* (67) and "make it super bright" to goodnight / off; all_inv got the direction
   right. The model has no stable reading of intensifiers outside the generator's list
   ("as hell", "super", "really").
+
+## 2026-09-27: Home Assistant templates + prompt-only mode
+
+`dink/gen/ha.py`: Home Assistant's own English voice templates (OHF-Voice/intents,
+CC-BY-4.0) -> 7.5k prompt-only scenarios over 26 intents (4.9k of them in training). They're
+sampled per template block, labeled by HA's recognizer (hassil), and use hard negatives (same
+device with the other verb, same verb on another device). Test sets:
+- test_ha: HA's hand-written test sentences for the 26 trained intents (809);
+- test_ha_unseen: 11 intents never trained (91).
+Prompt-only: `--no-state 0.3` removes the whole state from 30% of draws of state-independent
+request kinds (dink/evals/nostate.py); test_nostate scores that mode.
+
+`all_v8`: split_v8 (= split_v7 + HA), 20k steps. 168 thermal pauses; the run took 2.8 h
+instead of about 36 min.
+
+| set | all_v7 | all_v8 |
+|---|---|---|
+| test_ha (HA's hand-written sentences) | 0.551 | **0.956** |
+| test_ha_unseen (11 unseen HA intents) | 0.582 | **0.780** |
+| test_nostate (prompt-only) | 0.945 | 0.957 |
+| test_areas / test_worlds | 0.900 / 0.870 | 0.900 / 0.876 |
+| test_llm (smart home) | 0.836 | 0.820 |
+| test_words (smart home) | 0.864 | 0.850 |
+| hard cases | 28/32 | 27/32 |
+
+Readings:
+- A small amount of HA data (4% of training) takes HA's own test sentences from 0.55 to 0.96.
+- Unseen HA intents: fan speed, timers, vacuum-to-base, never-mind 1.00; previous track 0.86.
+  List and shopping items 0-0.5, and "today's date" 0. These need a text argument (the item)
+  or have no near analogue in training.
+- Prompt-only was already good (0.945), and nudged up.
+- Smart-home language keeps slipping as other data grows. Across the last three runs:
+  test_llm 0.858 -> 0.836 -> 0.820, test_words 0.876 -> 0.864 -> 0.850. The smart home is
+  now 26% of training. It needs balancing (sampling weights per source) or more smart-home
+  phrasing data.
