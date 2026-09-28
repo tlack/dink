@@ -104,8 +104,14 @@ def ask(model, state, tools, prompt, answer=None):
     rows = [(fmt(t), probs[i], i) for i, t in enumerate(tools)] + [("(nothing relevant)", probs[-1], len(tools))]
     for label, pr, i in sorted(rows, key=lambda r: -r[1]):
         mark = "->" if i == best else "  "
-        right = "  <- right answer" if answer is not None and answer[i] >= max(answer) - 1e-6 else ""
+        right = ""
+        if answer is not None and answer[i] > 0:
+            right = "  <- right answer" if answer[i] >= max(answer) - 1e-6 else "  <- also acceptable"
         print(f"  {mark} {label:30s} {pr:6.1%}  {'#' * round(pr * 30)}{right}")
+    if answer is not None:
+        verdict = ("RIGHT (the best answer)" if answer[best] >= max(answer) - 1e-6 else
+                   "ACCEPTABLE (close enough)" if answer[best] > 0 else "WRONG")
+        print(f"  verdict: {verdict}")
     print()
 
 

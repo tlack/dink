@@ -42,6 +42,44 @@ from .ordinal import offer_both, weights as graded
 # Relative requests whose strength picks among the offered options by rank (dink/gen/ordinal.py)
 ORDINAL = {"relative_small": "small", "relative_big": "big", "int_small": "small", "int_plain": "plain",
            "int_big": "big", "int_max": "max"}
+# Requests that move a setting by an amount the LLM judged. They're ordinal too, with the strength
+# read from both labelings (amount_strength); labelings two strengths apart are dropped.
+JUDGED = {"complaint", "desire", "slang", "inv_opposite", "inv_reframe"}
+LEVELS = ["small", "plain", "big", "max"]
+
+
+def level(frac):
+    """Share of the room left -> strength."""
+    return 0 if frac < 0.25 else 1 if frac < 0.5 else 2 if frac < 0.85 else 3
+
+
+def amount_strength(world, u):
+    """(strength, None) for an ordinal movement request, (None, reason) to drop it, or
+    (None, None) if it isn't one (not a move of a valued setting from a known value)."""
+    kind = u["kind"]
+    if kind == "inv_opposite" and u.get("parent_kind") in ORDINAL:
+        kind = u["parent_kind"]                     # "way more" flipped keeps "way more"
+    if kind not in ORDINAL and kind not in JUDGED:
+        return None, None
+    a = next((x for x in world["actions"] if x["name"] == u["action"]), None)
+    if a is None or a["lo"] is None or not a.get("sets") or u.get("value") is None:
+        return None, None
+    cur = state_for(world, u).get(a["sets"], {}).get("value")
+    if cur is None or abs(u["value"] - cur) < 1e-9:
+        return None, None
+    if kind in ORDINAL:
+        return ORDINAL[kind], None
+    up = u["value"] > cur
+    room = max((a["hi"] - cur) if up else (cur - a["lo"]), 1e-9)
+    fracs = [abs(u["value"] - cur) / room]
+    rep = u.get("replay")
+    if rep and rep.get("action") == u["action"] and rep.get("value") is not None:
+        if (rep["value"] - cur) * (u["value"] - cur) <= 0:
+            return None, "labelings move different ways"
+        fracs.append(abs(rep["value"] - cur) / room)
+        if abs(level(fracs[0]) - level(fracs[1])) >= 2:
+            return None, "labelings disagree on the amount"
+    return LEVELS[level(sum(fracs) / len(fracs))], None
 
 SRC = Path("data/llm/worlds.jsonl")
 UP = {"warmer", "hotter", "higher", "faster", "brighter", "stronger", "louder", "more", "increase", "raise",
@@ -151,13 +189,19 @@ def validate(worlds):
         labels = collections.defaultdict(set)
         for u in utts:
             labels[u["say"]].add((u["action"], u.get("value")))
-        parent = None
+        parent, parent_bad = None, False
         for u in utts:
             if u["source"] == "request":
                 parent = u
+                parent_bad = amount_strength(w, u)[1] is not None
             if u["source"] == "flip" and parent is not None and parent.get("limit"):
                 u = dict(u, limit=parent["limit"])          # labeled with the field at its limit
             p = problems(w, u, parent if u["source"] == "flip" else None)
+            bad = amount_strength(w, u)[1]
+            if bad:
+                p.append(bad)
+            elif u["source"] == "same" and parent_bad:
+                p.append("rewording of a request whose labelings disagree on the amount")
             if len(labels[u["say"]]) > 1:
                 p.append("same words, two labels")
             if p:
@@ -236,15 +280,15 @@ def scenario(world, u, rng, style):
             tools.append(Field(nm, v, a["lo"], a["hi"]))
 
     cur_right = st.get(right["sets"], {}).get("value") if right is not None and right.get("sets") else None
-    if right is not None and u["kind"] in ORDINAL and right["lo"] is not None and cur_right is not None \
-            and abs(u["value"] - cur_right) > 1e-9:
+    strength = amount_strength(world, u)[0] if right is not None else None
+    if strength is not None and cur_right is not None:
         # strength picks by rank among coarse offered values; several can be right
         up = u["value"] > cur_right
         ups, downs = offer_both(cur_right, right["lo"], right["hi"], rng, whole=right.get("int", False))
         moves, back = (ups, downs) if up else (downs, ups)
         for v in moves + back:                   # both directions, equal counts
             add(right, v)
-        rights = graded(moves, cur_right, right["lo"], right["hi"], up, ORDINAL[u["kind"]])
+        rights = graded(moves, cur_right, right["lo"], right["hi"], up, strength)
         if not rights:
             return None
     elif right is not None:
