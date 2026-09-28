@@ -433,3 +433,37 @@ Readings:
 - Still wrong: "hot as hell" -> 73 (plain; want the biggest, 76); "make it a little warmer"
   -> 73 (want the smallest, 71); "make it really dark" -> lights on; "is it dark outside yet"
   -> goodnight (a question taken as a scene).
+
+## 2026-09-28: judged amounts cleaned (ordinal from both labelings)
+
+Found by hand: "decrease fountain height way more" was stored as 1.3 (a small drop); the
+second labeling said 0.5, but agreement compared directions only. For judged moves
+(complaint, desire, slang, inverted variants), the two labelings' amounts differed by more
+than 20% of the range in 6-15% of cases. Fix (`dink/gen/worlds.py`, `amount_strength`):
+- judged moves take a strength (a bit / plain / a lot / all the way) from the average of both
+  labelings' shares of the room left, and pick by rank;
+- requests whose labelings are two strengths apart are dropped with their rewordings
+  (about 2,250 utterances), and 235 more because the labelings moved in opposite directions;
+- inverted variants of "a bit" / "a lot" keep their parent's strength.
+
+`all_v13`: split_v13 (cleaned), otherwise as all_v12 (graded + rank loss 0.5, 40k steps).
+153 thermal pauses. Both models scored on split_v13's tests.
+
+| set | all_v12 ok | all_v13 ok |
+|---|---|---|
+| test_areas | 0.914 | 0.914 |
+| test_worlds | 0.914 | 0.918 |
+| test_llm | 0.878 | 0.888 |
+| test_words | 0.836 | 0.832 |
+| test_templates | 0.910 | 0.924 |
+| test_styles | 0.912 | 0.932 |
+| test_mixed | 0.860 | 0.890 |
+| test_ha / test_ha_unseen | 0.964 / 0.780 | 0.939 / 0.769 |
+| hard cases (38) | 30 | **37** |
+
+Readings:
+- Hard cases 37/38: "hot as hell", "really dark", "is it dark outside yet" and all count probes
+  now pass. The one miss is "make it a little warmer" (long names) -> 73; the smallest move,
+  71, was wanted.
+- Held-out sets flat to slightly up (within noise); HA dips 2.5 points (watch).
+- Weakest kinds in unseen areas: inverted reframes 0.65, complaints 0.72, desires 0.80.
