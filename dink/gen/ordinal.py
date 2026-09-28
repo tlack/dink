@@ -32,20 +32,37 @@ def nice(v, lo, hi, whole):
     return float(round(v)) if (whole or span >= 10) and step >= 1 else round(v, 2)
 
 
-def offer(cur, lo, hi, up, rng, whole=False):
-    """2-4 coarse values that move from cur toward hi (up) or lo, well apart, sorted by the
-    size of the move. Fewer if the device can't move that far. [] at the limit."""
+def offer_both(cur, lo, hi, rng, whole=False, most=3):
+    """Options in both directions with EQUAL counts (when the device can move both ways), so
+    the number of options on a side says nothing about which way the request goes. Returns
+    (up, down), each sorted by the size of the move."""
+    n = rng.randint(1, most)
+    up, down = offer(cur, lo, hi, True, rng, whole, n), offer(cur, lo, hi, False, rng, whole, n)
+    if up and down:
+        k = min(len(up), len(down))
+        up = sorted(rng.sample(up, k), key=lambda v: abs(v - cur))
+        down = sorted(rng.sample(down, k), key=lambda v: abs(v - cur))
+    return up, down
+
+
+def offer(cur, lo, hi, up, rng, whole=False, n=None):
+    """1-4 coarse values that move from cur toward hi (up) or lo, well apart, sorted by the
+    size of the move. Fewer if the device can't move that far. [] at the limit.
+
+    Callers offer BOTH directions this way, each with its own independent count: offering
+    more options in the asked direction let the model read the direction off the counts
+    instead of the request ("i'm hot" -> warmer when three warmer options were offered)."""
     room = (hi - cur) if up else (cur - lo)
     if room <= 1e-9:
         return []
-    n = rng.choice([2, 3, 3, 4, 4])
-    fracs = sorted(rng.sample(FRACTIONS, n))        # the end (1.0) is often left out: "max" must still work
+    n = n or rng.choice([1, 2, 3, 3, 4])
     gap = 0.08 * (hi - lo)
-    out = []
-    for f in fracs:
+    valid = []                                      # every fraction that gives a real, distinct move
+    for f in FRACTIONS:
         v = nice(cur + (1 if up else -1) * f * room, lo, hi, whole)
-        if abs(v - cur) >= 0.04 * (hi - lo) and all(abs(v - o) >= gap for o in out):
-            out.append(v)
+        if abs(v - cur) >= 0.04 * (hi - lo) and all(abs(v - o) >= gap for o in valid):
+            valid.append(v)
+    out = rng.sample(valid, min(n, len(valid)))     # the end is often left out: "max" must still work
     return sorted(out, key=lambda v: abs(v - cur))
 
 

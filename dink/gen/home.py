@@ -11,7 +11,7 @@ from dataclasses import dataclass, field, replace
 
 from ..data.scenario import MAX_SLOTS, PROMPT_BYTES, Field, Scenario
 from . import names as N
-from .ordinal import offer, weights
+from .ordinal import offer_both, weights
 
 
 # ---------------------------------------------------------------- configuration
@@ -301,7 +301,7 @@ class HomeGen:
     INTENTS = [  # (name, weight)
         ("relative", 4.0), ("turn", 2.0), ("indirect", 1.5), ("numeric", 1.0), ("lock", 1.2),
         ("scene", 0.6), ("none_offdomain", 0.8), ("none_question", 0.4), ("none_missing", 0.8),
-        ("none_limit", 0.5), ("none_noise", 0.2),
+        ("none_limit", 1.5), ("none_noise", 0.2),
     ]
 
     def _try(self):
@@ -398,7 +398,7 @@ class HomeGen:
     def finish(self, intent, cls, tools, state, target_idx, prompt, chunks, room=None, ambiguous=False,
                needed=()):
         """target_idx: {tool index: weight} (normalized here), or {} for "nothing relevant"."""
-        if tools is None or prompt is None:
+        if not tools or prompt is None:          # never a scenario without tools
             return None
         order = list(range(len(tools)))
         self.rng.shuffle(order)
@@ -458,7 +458,7 @@ class HomeGen:
             self._movable(x, up, at_limit=force_limit)
         must, target, needed = [], {}, []
         for x in cands:
-            self._ordinal(x, up, STRENGTH[intensity], style, must, target)
+            self._ordinal(x, up, STRENGTH[intensity], style, must, target, most=3 if len(cands) == 1 else 1)
             needed.append(x)
         others = [x for x in devs if x not in cands]
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, needed, occ)
@@ -474,13 +474,13 @@ class HomeGen:
             s.meta["dir"] = direction
         return s
 
-    def _ordinal(self, x, up, strength, style, must, target):
+    def _ordinal(self, x, up, strength, style, must, target, most=3):
         """Offer coarse values for a relative request and mark the right ones by rank
         (dink/gen/ordinal.py); a device at its limit gets only moves the other way."""
         k, rng = x.kobj, self.rng
-        moves = offer(x.value, k.lo, k.hi, up, rng, whole=k.integer)
-        back = offer(x.value, k.lo, k.hi, not up, rng, whole=k.integer)
-        keep = moves + back[:rng.randint(0, 1) if moves else rng.randint(1, 2)]
+        ups, downs = offer_both(x.value, k.lo, k.hi, rng, whole=k.integer, most=most)
+        moves, back = (ups, downs) if up else (downs, ups)
+        keep = moves + back                     # both directions, equal counts
         if not keep:
             return
         base = len(must)
@@ -552,7 +552,7 @@ class HomeGen:
             self._movable(x, up)
         must, target = [], {}
         for x in cands:
-            self._ordinal(x, up, STRENGTH[intensity], style, must, target)
+            self._ordinal(x, up, STRENGTH[intensity], style, must, target, most=3 if len(cands) == 1 else 1)
         others = [x for x in devs if x not in cands]
         tools, state = self.assemble(devs, style, n_tools, n_state, must, others, cands, occ)
         prompt, chunks = self.from_bank("indirect", d.kind, direction, intensity, d.room if mention else None) \

@@ -22,7 +22,7 @@ CASES = [
     ("i'm freezing", ["t76"]),
     ("i want it cold in here", ["t67"]),
     ("make it really dark in here", ["l0"]),
-    ("it's too dark in here", ["l0.6"]),
+    ("it's too dark in here", ["l0.6", "l1"]),      # plain, two brighter options: either is fine
     ("make it super bright", ["l1"]),
     ("lights off", ["l0"]),
     ("goodnight", ["scene"]),

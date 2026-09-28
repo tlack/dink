@@ -37,7 +37,7 @@ from ..data.numbers import extract
 from ..data.scenario import MAX_SLOTS, Field, Scenario
 from . import names as N
 from .bank import annotate
-from .ordinal import offer, weights as graded
+from .ordinal import offer_both, weights as graded
 
 # Relative requests whose strength picks among the offered options by rank (dink/gen/ordinal.py)
 ORDINAL = {"relative_small": "small", "relative_big": "big", "int_small": "small", "int_plain": "plain",
@@ -240,9 +240,9 @@ def scenario(world, u, rng, style):
             and abs(u["value"] - cur_right) > 1e-9:
         # strength picks by rank among coarse offered values; several can be right
         up = u["value"] > cur_right
-        moves = offer(cur_right, right["lo"], right["hi"], up, rng, whole=right.get("int", False))
-        back = offer(cur_right, right["lo"], right["hi"], not up, rng, whole=right.get("int", False))
-        for v in moves + back[:rng.randint(0, 1)]:
+        ups, downs = offer_both(cur_right, right["lo"], right["hi"], rng, whole=right.get("int", False))
+        moves, back = (ups, downs) if up else (downs, ups)
+        for v in moves + back:                   # both directions, equal counts
             add(right, v)
         rights = graded(moves, cur_right, right["lo"], right["hi"], up, ORDINAL[u["kind"]])
         if not rights:
