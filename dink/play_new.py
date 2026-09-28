@@ -17,7 +17,14 @@ then how much). Each request is scored against the LLM's label:
 
 Rows where the two LLM labelings disagree are marked "?": those are questions about the
 generation prompt, not about Dink. After the table, type your own requests (-i is the
-default; --no-interactive skips it). Gadgets are saved to data/llm/play_new/.
+default; --no-interactive skips it).
+
+Everything is kept in data/llm/play_new/ for later exploration:
+  <gadget>.json           the LLM's gadget: setting, state, actions, requests with both labelings
+  <gadget>.results.jsonl  one line per scored request and per request you type, on every run
+                          or replay: model, both harness passes, pick, verdict, the LLM labels
+  index.jsonl             one line per session: gadget, idea, model, right / close / wrong
+The LLM calls themselves are in data/llm/calls.jsonl (full prompts and replies).
 """
 import argparse
 import json
@@ -110,6 +117,18 @@ def generate(idea, seed):
     return rec
 
 
+def field_str(t):
+    return f"{t.name}={t.value:g}" if t.arg else f"{t.name}()"
+
+
+def log_row(res, **extra):
+    """A JSON-able record of one harness decision."""
+    top = lambda opts: [[field_str(t), round(p, 4)] for t, p in sorted(opts, key=lambda x: -x[1])] if opts else None
+    return dict(extra, pick=None if res["pick"] is None else field_str(res["pick"]), p=round(res["p"], 4),
+                unsure=bool(res.get("unsure")), nothing_pass1=round(res["nothing1"], 4),
+                pass1=top(res["pass1"]), pass2=top(res["pass2"]))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("idea", nargs="*", help='a seed idea, e.g. "an oil refinery"')
@@ -120,10 +139,11 @@ def main():
     ap.add_argument("--seed", type=int, default=None)
     a = ap.parse_args()
     model = load_model(a.run, "cpu")
+    idea = " ".join(a.idea).strip()
     if a.load:
-        g = json.loads(Path(a.load).read_text())
+        path = Path(a.load)
+        g = json.loads(path.read_text())
     else:
-        idea = " ".join(a.idea).strip()
         print(f"  asking the LLM for a gadget{' about ' + repr(idea) if idea else ''} ...")
         g = generate(idea, a.seed if a.seed is not None else int(time.time()))
         SAVE.mkdir(parents=True, exist_ok=True)
@@ -132,6 +152,13 @@ def main():
         path.write_text(json.dumps(g, indent=1))
         print(f"  saved {path}")
     show_gadget(g)
+    g.setdefault("idea", idea)
+    log_path = path.with_suffix(".results.jsonl")
+    session = {"session": time.strftime("%Y-%m-%d %H:%M:%S"), "run": a.run, "gadget": path.name}
+
+    def log(rec):
+        with open(log_path, "a") as f:
+            f.write(json.dumps(dict(session, **rec)) + "\n")
 
     rows = [u for u in g["utterances"] if a.all or u["source"] == "request"]
     tally = {"RIGHT": 0, "CLOSE": 0, "WRONG": 0}
@@ -150,12 +177,20 @@ def main():
         rep = u.get("replay")
         second = f"  [2nd: {fmt_label(rep['action'], rep.get('value'))}]" if doubt and rep else ""
         tally[v] += 1
+        log(log_row(res, type="scored", kind=u["kind"], source=u["source"], say=u["say"], verdict=v,
+                    strength=strength, llm=fmt_label(u["action"], u.get("value"), g),
+                    llm_second=fmt_label(rep["action"], rep.get("value"), g) if rep else None,
+                    llm_agree=u.get("agree"), at_limit=bool(u.get("limit"))))
         print(f"  {u['kind'][:14]:14s} {u['say'][:44]:44s} {fmt_label(u['action'], u.get('value'), g)[:30]:30s} "
               f"{pick[:28]:28s} {res['p']:5.0%} {v}{doubt}{second}")
     n = len(rows)
     print(f"\n  {tally['RIGHT']}/{n} right, {tally['CLOSE']} close, {tally['WRONG']} wrong"
           f"   (? = the two LLM labelings disagree: a question for the prompt, not for Dink;"
           f" ~ = a near-tie, a device would ask)")
+    with open(SAVE / "index.jsonl", "a") as f:
+        f.write(json.dumps(dict(session, setting=g["setting"], area=g["area"], idea=g.get("idea") or None,
+                                scored=n, **{k.lower(): c for k, c in tally.items()})) + "\n")
+    print(f"  logged to {log_path}")
     if a.no_interactive:
         return
     print("\n  your own requests (empty line or :quit to stop; :why shows both passes)")
@@ -177,6 +212,7 @@ def main():
             print(f"  pass 1 'nothing relevant': {last['nothing1']:.1%}")
             continue
         last = decide(model, g, line)
+        log(log_row(last, type="typed", say=line))
         pick = last["pick"]
         print(f"  -> {'(nothing relevant)' if pick is None else pick.name + ('=' + format(pick.value, 'g') if pick.arg else '()')}"
               f"   {last['p']:.0%}")
