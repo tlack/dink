@@ -57,8 +57,24 @@ def gate_cases():
     return out
 
 
+# Option counts must not give the direction away (the first ordinal data taught exactly that).
+THERMO = [("i'm hot", [71, 73, 76, 67], [67]), ("i'm freezing", [71, 73, 76, 67], [76]),
+          ("i'm hot", [73, 67, 64, 61], [64]), ("i'm freezing", [73, 67, 64, 61], [73]),
+          ("make it a bit warmer", [73, 67, 64, 61], [73]), ("make it a little cooler", [71, 73, 76, 67], [67])]
+
+
+def count_cases():
+    out = []
+    for prompt, values, right in THERMO:
+        tools = [Field("set_bedroom_thermostat", v, 60, 85) for v in values] + [Field("goodnight", 0, 0, 0, arg=False)]
+        target = [1.0 / len(right) if t.arg and t.value in right else 0.0 for t in tools] + [0.0]
+        out.append(Scenario([Field("bedroom_thermostat", 70, 60, 85)], prompt, tools, target,
+                            {"cls": "hard_counts"}).check())
+    return out
+
+
 def cases():
-    out = gate_cases()
+    out = gate_cases() + count_cases()
     for style, i in (("long", 0), ("short", 1)):
         state = [Field(f[i], f[2], f[3], f[4]) for f in STATE]
         keys = list(TOOLS) + ["scene"]
