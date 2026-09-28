@@ -372,3 +372,35 @@ Readings:
      generator's scale, expects 1.
 - The gate case {0, 0.5} failed this run (0.5 for "close"); it's unstable across runs.
 - test_ha_unseen dips on only 91 sentences.
+
+## 2026-09-27: ordinal strength, and the option-count shortcut it created
+
+`all_v10`: ordinal labels (`dink/gen/ordinal.py`). Relative requests pick among coarse offered
+values by rank ("a bit" = smallest move, plain = middle, "a lot" = upper half, "all the way"
+= most extreme offered), every acceptable answer is right, and the raw log-magnitude input is
+gone. Split v10, 40k steps, balanced mix. 181 thermal pauses.
+
+On split_v10 tests it looked excellent vs all_v9 (unseen areas 0.812 -> 0.910, smart-home
+LLM phrasings 0.730 -> 0.812, held-out words 0.756 -> 0.846). But the hard cases fell to 22/32,
+with wrong *directions* ("i'm hot" -> warmer).
+
+Cause: the v10 generator offered 2-4 options in the asked direction and 0-1 the other way,
+so the model read the direction off the counts. Probe (thermostat at 70):
+
+| offered | "i'm hot" | "i'm freezing" |
+|---|---|---|
+| 3 warmer, 1 cooler | 73 (wrong) | 76 |
+| 1 warmer, 3 cooler | 64 | 61 (wrong) |
+| 2 and 2 | 67 | 64 (wrong) |
+
+The test sets had the same imbalance, so they couldn't see it. Fixes:
+- `offer_both()` gives both directions equal counts whenever the device can move both ways;
+- `offer()` never returns nothing for a movable device (a 0..3 fan could get zero tools);
+- limit requests weigh 1.5 instead of 0.5, so one-sided option sets (a device at an end)
+  still need the words to be read;
+- hard cases gain six count probes (38 in total).
+
+all_v10 on the balanced split_v12 tests (ok = any acceptable pick):
+unseen areas 0.898, worlds 0.870, llm 0.780, words 0.816, templates 0.906.
+Hard cases: all_v10 27/38 (fails 3 count probes); all_v9 32/38 (right directions everywhere).
+The graded run (`all_v11`) was stopped: it trained on the same leaky data.
