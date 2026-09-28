@@ -404,3 +404,32 @@ all_v10 on the balanced split_v12 tests (ok = any acceptable pick):
 unseen areas 0.898, worlds 0.870, llm 0.780, words 0.816, templates 0.906.
 Hard cases: all_v10 27/38 (fails 3 count probes); all_v9 32/38 (right directions everywhere).
 The graded run (`all_v11`) was stopped: it trained on the same leaky data.
+
+## 2026-09-27: balanced ordinal data + graded targets + ranking loss
+
+`all_v12`: split_v12 (ordinal, equal option counts both ways), graded right answers (best fit
+1, other acceptable 0.5), `--rank-loss 0.5`, 40k steps, balanced mix. 195 thermal pauses.
+Both models scored on split_v12's balanced tests. ok = any acceptable pick; best = the
+top-weighted pick.
+
+| set | all_v10 ok | all_v12 ok | all_v10 best | all_v12 best |
+|---|---|---|---|---|
+| test_areas | 0.898 | **0.930** | 0.892 | 0.926 |
+| test_worlds | 0.870 | **0.914** | 0.866 | 0.906 |
+| test_llm | 0.780 | **0.882** | 0.750 | 0.872 |
+| test_words | 0.816 | **0.858** | 0.794 | 0.836 |
+| test_templates | 0.906 | 0.938 | 0.860 | 0.908 |
+| test_styles | 0.908 | 0.942 | 0.896 | 0.934 |
+| test_indist | 0.920 | 0.974 | 0.912 | 0.974 |
+| test_ha_unseen | 0.714 | 0.780 | | |
+| hard cases (38) | 27 | **30** | | |
+
+Readings:
+- Every held-out set improves. The gain combines the balanced data and the graded targets
+  with the ranking loss; this pair of runs can't separate the two.
+- All six option-count probes pass: the direction now comes from the words.
+- "best" sits close to "ok": when the model is acceptable, it usually also picks the
+  best-fitting option.
+- Still wrong: "hot as hell" -> 73 (plain; want the biggest, 76); "make it a little warmer"
+  -> 73 (want the smallest, 71); "make it really dark" -> lights on; "is it dark outside yet"
+  -> goodnight (a question taken as a scene).
