@@ -1,6 +1,6 @@
 """Score a trained Dink checkpoint on a split's test sets.
 
-  uv run python -m dink.evaluate runs/dink/big_tmpl --split data/home/split_v2
+  uv run python -m dink.evaluate models/dink-v13 --split data/home/split_v13
 """
 import argparse
 from pathlib import Path
@@ -18,7 +18,7 @@ def main():
     ap.add_argument("--sets", default="test_*")
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
-    ck = torch.load(Path(a.run) / "model.pt", weights_only=False, map_location=a.device)
+    ck = torch.load(Path(a.run) / "model.pt", weights_only=True, map_location=a.device)
     model = Dink(width=ck["args"]["width"], scenario=ck["args"].get("scenario", False),
                  raw_magnitude=ck["args"].get("raw_magnitude", True)).to(a.device)
     model.load_state_dict(ck["state"])

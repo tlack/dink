@@ -34,7 +34,7 @@ import time
 from pathlib import Path
 
 from .harness import decide
-from .play import load_model
+from .play import DEFAULT_RUN, load_model
 
 SAVE = Path("data/llm/play_new")
 
@@ -133,7 +133,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("idea", nargs="*", help='a seed idea, e.g. "an oil refinery"')
     ap.add_argument("--load", default=None, help="a saved gadget (skips the LLM)")
-    ap.add_argument("--run", default="runs/dink/all_v13")
+    ap.add_argument("--run", default=DEFAULT_RUN)
     ap.add_argument("--all", action="store_true", help="also score the rewordings and flips, not just the 12 requests")
     ap.add_argument("--no-interactive", action="store_true")
     ap.add_argument("--seed", type=int, default=None)
@@ -153,7 +153,8 @@ def main():
         print(f"  saved {path}")
     show_gadget(g)
     g.setdefault("idea", idea)
-    log_path = path.with_suffix(".results.jsonl")
+    SAVE.mkdir(parents=True, exist_ok=True)            # logs always go here, even for a gadget loaded from elsewhere
+    log_path = SAVE / f"{path.stem}.results.jsonl"
     session = {"session": time.strftime("%Y-%m-%d %H:%M:%S"), "run": a.run, "gadget": path.name}
 
     def log(rec):

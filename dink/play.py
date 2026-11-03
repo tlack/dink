@@ -79,8 +79,11 @@ def fmt(f):
     return f"{f.name}()" if not f.arg else f"{f.name}={f.value:g} [{f.lo:g}..{f.hi:g}]"
 
 
+DEFAULT_RUN = "models/dink-v13"     # the released model; training writes runs/dink/<name>
+
+
 def load_model(run, device):
-    ck = torch.load(Path(run) / "model.pt", weights_only=False, map_location=device)
+    ck = torch.load(Path(run) / "model.pt", weights_only=True, map_location=device)
     m = Dink(width=ck["args"]["width"], scenario=ck["args"].get("scenario", False),
              raw_magnitude=ck["args"].get("raw_magnitude", True)).to(device)
     m.load_state_dict(ck["state"])
@@ -126,7 +129,7 @@ def random_case(split):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("prompt", nargs="?")
-    ap.add_argument("--run", default="runs/dink/all_v13")
+    ap.add_argument("--run", default=DEFAULT_RUN)
     ap.add_argument("--state", default="")
     ap.add_argument("--tools", default="")
     ap.add_argument("-i", "--interactive", action="store_true")

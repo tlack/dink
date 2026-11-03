@@ -6,7 +6,7 @@ dark" = brighter, "make it dark" = off), intensifiers outside the generator's li
 hell", "super", "crank"), and requests that only look like commands. Each case exists in
 long names (bedroom_thermostat) and short ones (bed_temp / set_bedt).
 
-  uv run python -m dink.evals.hard --run runs/dink/big_llm
+  uv run python -m dink.evals.hard --run models/dink-v13
 """
 import argparse
 
@@ -93,7 +93,7 @@ def main():
     from ..data.collate import collate
     from ..play import load_model
     ap = argparse.ArgumentParser()
-    ap.add_argument("--run", default="runs/dink/big_llm")
+    ap.add_argument("--run", default="models/dink-v13")
     a = ap.parse_args()
     model = load_model(a.run, "cpu")
     items = cases()
