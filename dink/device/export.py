@@ -1,4 +1,4 @@
-"""Export a trained Dink for the ESP32: one file the C engine (BabyTalk's dink_engine) maps
+"""Export a trained Dink for the ESP32: one file the C engine (esp32/components/dink) maps
 in place.
 
   uv run python -m dink.device.export models/dink-v13 --out models/dink-v13/dink.dnk

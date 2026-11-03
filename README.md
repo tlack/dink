@@ -132,17 +132,18 @@ With an [OpenRouter](https://openrouter.ai) key in `.env`, `uv run python -m din
 
 ## On the ESP32-S3
 
-Dink runs on an ESP32-S3 (240 MHz, no PSRAM needed) through BabyTalk's MMRT runtime: the
-`dink_engine` component and a test firmware in [BabyTalk's `dink/`](https://github.com/tlack/babytalk/tree/main/dink).
-The text encoder's convolutions run on MMRT's int8 vector kernels; the rest is float32 C.
+Dink runs on an ESP32-S3 (240 MHz, no PSRAM needed). The C engine and a test firmware are in
+[esp32/](esp32/README.md). They build on MMRT, the inference runtime from
+[BabyTalk](https://github.com/tlack/babytalk) (a git submodule): the text encoder's
+convolutions run on MMRT's int8 vector kernels, and the float32 layers use its `mmrt_f32` ops.
 Measured on the board:
 
 | | |
 |---|---|
-| one request, both harness passes | **93 ms** average, 124 ms worst (44 requests) |
+| one request, both harness passes | **92 ms** average, 123 ms worst (44 requests) |
 | encode a request (int8, MMRT) | 15 ms |
 | encode a name (once per gadget, then cached) | 9 ms |
-| score 8 options against 8 state fields (float32) | 58 ms |
+| score 8 options against 8 state fields (float32) | 57 ms |
 | working memory | 59 KB internal RAM, plus MMRT's 72 KB staging buffers |
 | model file | 623 KB in flash, read in place |
 
@@ -272,6 +273,7 @@ uv run python -u -m dink.train --split data/home/split --batch 512 --steps 40000
 | `dink/data/` | scenario format, group splitter, collation, number extraction |
 | `dink/train.py`, `evaluate.py`, `evals/` | training, scoring, hard cases |
 | `dink/device/` | the ESP32 export (`.dnk`), its NumPy spec, and checks against the C engine |
+| `esp32/` | the C engine (`components/dink`), a test firmware, and MMRT (`babytalk`, a submodule) |
 
 ## External data and models
 

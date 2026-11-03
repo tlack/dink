@@ -1,10 +1,9 @@
-"""Check BabyTalk's C engine (components/dink_engine, built for the PC) against this repo:
+"""Check the C engine (esp32/components/dink, built for the PC) against this repo:
 number extraction against dink.data.numbers, dink_score against the NumPy reference with
 the int8 trunk, and dink_decide against dink.harness with the PyTorch model.
 
-  gcc -O2 -shared -fPIC -Immrt -Icomponents/dink_engine -o libdink.so mmrt/mmrt.c \\
-      mmrt/mmrt_ref.c mmrt/mmrt_port.c components/dink_engine/*.c -lm      # in BabyTalk
-  uv run python -m dink.device.check_c <babytalk>/libdink.so models/dink-v13
+  esp32/host/build.sh
+  uv run python -m dink.device.check_c esp32/host/libdink.so models/dink-v13
 """
 import argparse
 import ctypes as C
