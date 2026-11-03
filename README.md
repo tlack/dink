@@ -6,16 +6,17 @@ A tiny decision model for microcontrollers. A gadget gives Dink its current **st
 numbers with declared ranges), a short spoken or typed **request**, and up to 8 **options**.
 Dink returns a probability for each option, plus one for "nothing relevant".
 
-It has 204K parameters and needs about 6M multiply-adds per query, so it is sized for an
-ESP32-S3. Dink never generates text or numbers. The device offers candidate values ("set the
+It has 204K parameters and runs on an ESP32-S3: about 90 ms per request, in 59 KB of RAM,
+with the model read in place from flash. Dink never generates text or numbers. The device offers candidate values ("set the
 thermostat to 72 / 75 / 79") and Dink picks one, so every answer is a valid action.
 
 Named after Peter Dinklage: small, and punches far above its size. Companion to
 [BabyTalk](https://github.com/tlack/babytalk), on-device speech to text for the ESP32-S3,
 which can supply the spoken requests.
 
-**Status:** research release. The trained model (`models/dink-v13`) runs in PyTorch. The
-ESP32 runtime and weight export are not written yet; see [PLAN.md](PLAN.md).
+**Status:** research release. The trained model (`models/dink-v13`) runs in PyTorch, and on
+an ESP32-S3 through [BabyTalk](https://github.com/tlack/babytalk)'s MMRT runtime (see
+[On the ESP32-S3](#on-the-esp32-s3)).
 
 ## What it does
 
@@ -129,6 +130,43 @@ limit      make the outlet even hotter               LLM: (nothing)             
 With an [OpenRouter](https://openrouter.ai) key in `.env`, `uv run python -m dink.play_new
 "an oil refinery"` has the LLM invent a fresh gadget from any idea.
 
+## On the ESP32-S3
+
+Dink runs on an ESP32-S3 (240 MHz, no PSRAM needed) through BabyTalk's MMRT runtime: the
+`dink_engine` component and a test firmware in [BabyTalk's `dink/`](https://github.com/tlack/babytalk/tree/main/dink).
+The text encoder's convolutions run on MMRT's int8 vector kernels; the rest is float32 C.
+Measured on the board:
+
+| | |
+|---|---|
+| one request, both harness passes | **93 ms** average, 124 ms worst (44 requests) |
+| encode a request (int8, MMRT) | 15 ms |
+| encode a name (once per gadget, then cached) | 9 ms |
+| score 8 options against 8 state fields (float32) | 58 ms |
+| working memory | 59 KB internal RAM, plus MMRT's 72 KB staging buffers |
+| model file | 623 KB in flash, read in place |
+
+```
+dink> set the water to one hundred degrees
+  -> set_temperature=100  100%  (68 ms, 1 pass)
+dink> make it cooler
+  -> set_temperature=89  55%  (119 ms, 2 passes)
+dink> what's the weather
+  -> (nothing)  100%  (69 ms, 1 pass)
+```
+
+The device file is `models/dink-v13/dink.dnk`, made by `uv run python -m dink.device.export
+models/dink-v13`. [dink/device/reference.py](dink/device/reference.py) is the C engine's spec
+in NumPy and matches PyTorch to 1e-5. `dink.device.check_c` compares the C engine, built for
+the PC, with the Python on every step:
+
+| check | result |
+|---|---|
+| number extraction ("seventy two", "50 percent", "half") | 4,899 / 4,899 prompts agree |
+| the network, against the same int8 arithmetic in NumPy | 341 / 341 picks, probabilities within 1e-5 |
+| the two-pass harness, against PyTorch | 281 / 288 requests |
+| int8 vs float on held-out test sets | accuracy within one point (`dink.device.check`) |
+
 ## Results (dink-v13)
 
 Accuracy on held-out data (the best answer; "ok" scores in [models/dink-v13](models/dink-v13/README.md)):
@@ -147,8 +185,8 @@ Every experiment that led here, with its numbers and what we learned: [docs/resu
 
 ## Limitations
 
-- **No device runtime yet.** Weight export and the ESP32 inference code are planned, not
-  written. The cost figures (6M multiply-adds, about 10 ms on an ESP32-S3) are estimates.
+- **The device runs int8 for part of the network.** On the board, 42 of 44 example requests
+  give exactly PyTorch's answer; the other two differ by int8 rounding in the text encoder.
 - **English only.** Requests are at most 64 bytes and names at most 40. Longer text is cut
   from the front, without a warning.
 - **One action per request.** "Lights off and lock the door" is out of scope.
@@ -169,7 +207,9 @@ Every experiment that led here, with its numbers and what we learned: [docs/resu
   country music" and "put on jazz" to `play_rock`. Not settled yet. Candidates (details in [PLAN.md](PLAN.md), "Later ideas"): a text-valued argument
   encoded by the text encoder and fused like a number, or two passes (pick `play_music`,
   then run Dink again with the genres as its options, 8 per page).
-- **On the device:** weight export, low-bit weights, and the ESP32-S3 runtime.
+- **Faster on the device:** the float32 layers take most of a request (about 53 of 68 ms
+  for a one-pass answer); esp-dsp dot products or int8 weights for the mixer should roughly
+  halve it.
 - **Calibration:** measure whether Dink's probabilities can be trusted, and fit a
   temperature if they can't, so a device knows when to ask instead of act.
 
@@ -220,7 +260,7 @@ uv run python -u -m dink.train --split data/home/split --batch 512 --steps 40000
 
 | path | what |
 |---|---|
-| `models/dink-v13/` | the released weights, training args and test scores |
+| `models/dink-v13/` | the released weights, the ESP32 file (`dink.dnk`), training args and test scores |
 | `examples/` | `quickstart.py` and four LLM-invented gadgets with labeled requests |
 | `dink/model/` | the network: byte text encoder, value fuse, relation step, mixer, scorer |
 | `dink/harness.py` | turns a gadget and a request into options, two passes |
@@ -231,6 +271,7 @@ uv run python -u -m dink.train --split data/home/split --batch 512 --steps 40000
 | `dink/teacher/` | teacher probes and distillation of the text encoder |
 | `dink/data/` | scenario format, group splitter, collation, number extraction |
 | `dink/train.py`, `evaluate.py`, `evals/` | training, scoring, hard cases |
+| `dink/device/` | the ESP32 export (`.dnk`), its NumPy spec, and checks against the C engine |
 
 ## External data and models
 

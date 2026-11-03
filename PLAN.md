@@ -2,11 +2,12 @@
 
 > Working design notes, written before the first experiment and updated along the way. Some
 > questions here were settled later; [docs/results.md](docs/results.md) has what actually
-> happened. The on-device parts (sections 4, 5, 8, 9) are plans: Dink runs in PyTorch today.
+> happened. Dink now runs on an ESP32-S3 (README, "On the ESP32-S3"); the low-bit and
+> expert-tier parts (sections 5 and 8) are still plans.
 
 Dink picks what a device should do. Given a small structured **state**, a short text
 **prompt** (typed, or transcribed on-device by [BabyTalk](https://github.com/tlack/babytalk)), and up to 8 **tools**, it points
-at the best tool, or answers "nothing relevant". It is sized to run in milliseconds on an ESP32-S3.
+at the best tool, or answers "nothing relevant". It runs in about 90 ms on an ESP32-S3.
 
 ```
 state:  {"ac_set", 80, 60..85}  {"room_t", 88, 50..100}  {"humid", 40, 0..100}

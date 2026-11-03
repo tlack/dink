@@ -9,6 +9,7 @@ The released Dink model: training run `all_v13` (2026-09-27), 40,000 steps.
 | output | one probability per option, plus "nothing relevant" |
 | files | `model.pt`: `{"state": state_dict, "args": training args}`; loads with `torch.load(..., weights_only=True)`. `metrics.json`: training curve and every test score below |
 | sha256 (`model.pt`) | `cd5051dd4d8605457ad68f5b73bc03aab08840f39d5ff9343d3b85f89497fb9e` |
+| `dink.dnk` | the ESP32 file (623 KB): text-encoder convolutions in int8 for MMRT, the rest float32. Made by `uv run python -m dink.device.export models/dink-v13`; its int8 scales are calibrated on the validation split, so re-exporting without `data/` calibrates on the example gadgets only and may differ slightly. sha256 `63df7c7ef69072d0e4e347e1bfd67512b69dc99421fe3e724d084a798b29c65f` |
 
 ```python
 from dink.play import load_model
