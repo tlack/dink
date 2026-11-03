@@ -27,7 +27,8 @@ def nice(v, lo, hi, whole):
         step = 5 if span >= 50 else 1
     else:
         step = 0.05 * span
-    v = round(v / step) * step
+    end = hi if hi - v < step / 2 else lo if v - lo < step / 2 else None
+    v = end if end is not None else round(v / step) * step     # the range ends stay reachable
     v = min(hi, max(lo, v))
     return float(round(v)) if (whole or span >= 10) and step >= 1 else round(v, 2)
 

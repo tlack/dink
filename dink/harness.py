@@ -57,7 +57,7 @@ def ladder(gadget, a, prompt, fractions=FRACTIONS):
     said = said_numbers(prompt, a)
     vals = list(said)                            # numbers the user said come first: never trimmed
     if cur is None:
-        vals = [nice(a["lo"] + f * (a["hi"] - a["lo"]), a["lo"], a["hi"], whole) for f in (0, 0.25, 0.5, 0.75, 1)]
+        vals += [nice(a["lo"] + f * (a["hi"] - a["lo"]), a["lo"], a["hi"], whole) for f in (0, 0.25, 0.5, 0.75, 1)]
     else:
         for up in (True, False):
             room = (a["hi"] - cur) if up else (cur - a["lo"])
