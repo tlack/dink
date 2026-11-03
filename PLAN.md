@@ -5,7 +5,7 @@
 > happened. The on-device parts (sections 4, 5, 8, 9) are plans: Dink runs in PyTorch today.
 
 Dink picks what a device should do. Given a small structured **state**, a short text
-**prompt** (typed, or transcribed on-device by BabyTalk), and up to 8 **tools**, it points
+**prompt** (typed, or transcribed on-device by [BabyTalk](https://github.com/tlack/babytalk)), and up to 8 **tools**, it points
 at the best tool, or answers "nothing relevant". It is sized to run in milliseconds on an ESP32-S3.
 
 ```
@@ -192,6 +192,7 @@ mean?" when Dink answers "nothing relevant" or is unsure.
   (b) text-valued arguments: the argument is text ("country") encoded by the text encoder
   and cached, fused like a numeric value; (c) two passes: pick `play_music`, then run Dink
   again with the genres as its options (pages of 8 for long lists). Leaning (b) + (c).
+  Not settled or built yet; (a) is the workaround today.
 
 - **Beyond the microcontroller: Jev-style workloads** (noted 2026-09-26; parked until the
   gadget case works). Dink is a small decision model for any problem, not just physical
@@ -249,5 +250,5 @@ mean?" when Dink answers "nothing relevant" or is unsure.
 - [BitNetMCU](https://github.com/cpldcpu/BitNetMCU): ternary/low-bit networks on
   microcontrollers.
 - Branch-Train-Merge (Li et al., 2022) and Branch-Train-MiX (Sukhbaatar et al., 2024).
-- BabyTalk, the author's companion project for on-device speech to text on the ESP32-S3: the MMRT
-  runtime, storage-tier measurements, STT/TTS.
+- [BabyTalk](https://github.com/tlack/babytalk), the author's companion project for on-device
+  speech to text on the ESP32-S3: the MMRT runtime, storage-tier measurements, STT/TTS.

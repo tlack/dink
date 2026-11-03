@@ -10,7 +10,9 @@ It has 204K parameters and needs about 6M multiply-adds per query, so it is size
 ESP32-S3. Dink never generates text or numbers. The device offers candidate values ("set the
 thermostat to 72 / 75 / 79") and Dink picks one, so every answer is a valid action.
 
-Named after Peter Dinklage: small, and punches far above its size.
+Named after Peter Dinklage: small, and punches far above its size. Companion to
+[BabyTalk](https://github.com/tlack/babytalk), on-device speech to text for the ESP32-S3,
+which can supply the spoken requests.
 
 **Status:** research release. The trained model (`models/dink-v13`) runs in PyTorch. The
 ESP32 runtime and weight export are not written yet; see [PLAN.md](PLAN.md).
@@ -156,6 +158,20 @@ Every experiment that led here, with its numbers and what we learned: [docs/resu
   0.72 and 0.80 on unseen areas.
 - **A number for a missing device** can land on a device that is present (the refinery line above).
 - **Calibration has not been measured.** Treat "100%" as confident, not certain.
+
+## Roadmap
+
+- **Enum values: short strings as option values** ("play country", mode = eco / sleep /
+  turbo). Today values must be numbers in a range, and categories have no order, so mapping
+  them to 1 / 2 / 3 would teach Dink a ranking that isn't there. The workaround is one
+  no-value action per choice (`play_country`, `mode_eco`), which uses up slots and only
+  partly works: v13 picks `mode_eco` and `mode_turbo` correctly, but sends "play some
+  country music" and "put on jazz" to `play_rock`. Not settled yet. Candidates (details in [PLAN.md](PLAN.md), "Later ideas"): a text-valued argument
+  encoded by the text encoder and fused like a number, or two passes (pick `play_music`,
+  then run Dink again with the genres as its options, 8 per page).
+- **On the device:** weight export, low-bit weights, and the ESP32-S3 runtime.
+- **Calibration:** measure whether Dink's probabilities can be trusted, and fit a
+  temperature if they can't, so a device knows when to ask instead of act.
 
 ## How it works
 
