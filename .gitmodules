@@ -1,0 +1,3 @@
+[submodule "esp32/babytalk"]
+	path = esp32/babytalk
+	url = https://github.com/tlack/babytalk.git
