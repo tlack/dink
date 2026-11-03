@@ -1,8 +1,12 @@
 # Dink: a tiny decision model for microcontrollers
 
+> Working design notes, written before the first experiment and updated along the way. Some
+> questions here were settled later; [docs/results.md](docs/results.md) has what actually
+> happened. The on-device parts (sections 4, 5, 8, 9) are plans: Dink runs in PyTorch today.
+
 Dink picks what a device should do. Given a small structured **state**, a short text
 **prompt** (typed, or transcribed on-device by BabyTalk), and up to 8 **tools**, it points
-at the best tool, or answers "nothing relevant". It runs in milliseconds on an ESP32-S3.
+at the best tool, or answers "nothing relevant". It is sized to run in milliseconds on an ESP32-S3.
 
 ```
 state:  {"ac_set", 80, 60..85}  {"room_t", 88, 50..100}  {"humid", 40, 0..100}
@@ -245,4 +249,5 @@ mean?" when Dink answers "nothing relevant" or is unsure.
 - [BitNetMCU](https://github.com/cpldcpu/BitNetMCU): ternary/low-bit networks on
   microcontrollers.
 - Branch-Train-Merge (Li et al., 2022) and Branch-Train-MiX (Sukhbaatar et al., 2024).
-- BabyTalk (`~/work/esp32-micromodels`): MMRT runtime, storage-tier measurements, STT/TTS.
+- BabyTalk, the author's companion project for on-device speech to text on the ESP32-S3: the MMRT
+  runtime, storage-tier measurements, STT/TTS.

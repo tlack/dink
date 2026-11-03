@@ -1,5 +1,10 @@
 # Scenario generation
 
+> Written for the first generator (the smart home, `dink/gen/home.py`). Commands and sizes
+> here are from that stage; the released model also trains on LLM-invented gadgets and Home
+> Assistant templates and uses `configs/home_split_v4.json`. See the README and
+> [results.md](results.md) for the current recipe.
+
 Training data for Dink comes from scenario generators: code that builds a situation,
 a request, the tools on offer, and the provably right answer. The first one models a
 smart home (`dink/gen/home.py`).

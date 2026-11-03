@@ -60,7 +60,7 @@
 <title>fuse</title>
 <path stroke-width="1.6" d="M500,-537C500,-537 310,-537 310,-537 304,-537 298,-531 298,-525 298,-525 298,-507 298,-507 298,-501 304,-495 310,-495 310,-495 500,-495 500,-495 506,-495 512,-501 512,-507 512,-507 512,-525 512,-525 512,-531 506,-537 500,-537" style="fill:var(--fill-query,#e8f4ee);stroke:var(--query,#1f7a5a)"/>
 <text text-anchor="start" x="383.5" y="-523.4" font-family="var(--sans, Helvetica, sans-serif)" font-weight="bold" font-size="12.00" style="fill:var(--ink,#17211e)">fuse F</text>
-<text text-anchor="start" x="308" y="-513" font-family="var(--sans, Helvetica, sans-serif)" font-size="10.00" style="fill:var(--ink,#17211e)">MLP [name 64 ⊕ values 18] → 128 → 64</text>
+<text text-anchor="start" x="308" y="-513" font-family="var(--sans, Helvetica, sans-serif)" font-size="10.00" style="fill:var(--ink,#17211e)">MLP [name 64 ⊕ values 17] → 128 → 64</text>
 <text text-anchor="start" x="361" y="-503" font-family="var(--sans, Helvetica, sans-serif)" font-size="10.00" style="fill:var(--ink,#17211e)">+ role embedding</text>
 </g>
 <!-- nvec&#45;&gt;fuse -->

@@ -20,7 +20,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-This license covers the code in this repository. It does not cover the speech
-model files in models/ (NVIDIA Citrinet-256, CC-BY-4.0, see models/README.md) or
-third-party code downloaded at build time (MicroPython, sanoTTS, ESP-IDF); each keeps
-its own license. See "Credits and licenses" in README.md.
+This license covers the code in this repository and the trained weights in
+models/. The datasets and models used to train Dink are not redistributed here and
+keep their own licenses; see "External data and models" in README.md.

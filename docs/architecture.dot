@@ -29,7 +29,7 @@ digraph dink {
     nums   [label=<<b>number extractor</b><br/><font point-size="10">up to 3 numbers, words too<br/>raw (72) or level (50 %)</font>>, fillcolor="#000006"];
     vfeat  [label=<<b>value features V</b><br/><font point-size="10">(value − lo) / (hi − lo)<br/>16 bins + log magnitude + has-value</font>>];
 
-    fuse   [label=<<b>fuse F</b><br/><font point-size="10">MLP [name 64 ⊕ values 18] → 128 → 64<br/>+ role embedding</font>>];
+    fuse   [label=<<b>fuse F</b><br/><font point-size="10">MLP [name 64 ⊕ values 17] → 128 → 64<br/>+ role embedding</font>>];
     ptok   [label=<<b>prompt tokens</b><br/><font point-size="10">4 × 64</font>>];
     stok   [label=<<b>state tokens</b><br/><font point-size="10">8 × 64</font>>];
     ttok   [label=<<b>tool tokens</b><br/><font point-size="10">8 × 64</font>>];
