@@ -1,0 +1,813 @@
+{
+ "setting": "Hot Tub Jets and Sanitizer",
+ "about": "A hot tub owner uses it to check water temperature, pH, and sanitizer level, and to control jet pump speed and ozone generator.",
+ "area": "saunas and hot tubs",
+ "state": [
+  {
+   "name": "water_temperature",
+   "value": 102,
+   "lo": 80,
+   "hi": 104,
+   "unit": "\u00b0F"
+  },
+  {
+   "name": "ph_level",
+   "value": 7.4,
+   "lo": 6.8,
+   "hi": 8.2,
+   "unit": "pH"
+  },
+  {
+   "name": "sanitizer_level",
+   "value": 2.5,
+   "lo": 0,
+   "hi": 10,
+   "unit": "ppm"
+  },
+  {
+   "name": "jet_pump_speed",
+   "value": 1,
+   "lo": 0,
+   "hi": 3,
+   "unit": "speed"
+  },
+  {
+   "name": "ozone_generator",
+   "value": 0,
+   "lo": 0,
+   "hi": 1,
+   "unit": "on/off"
+  },
+  {
+   "name": "filter_cartridge_life",
+   "value": 45,
+   "lo": 0,
+   "hi": 100,
+   "unit": "%"
+  },
+  {
+   "name": "ambient_air_temp",
+   "value": 68,
+   "lo": 40,
+   "hi": 100,
+   "unit": "\u00b0F"
+  }
+ ],
+ "actions": [
+  {
+   "name": "set_temperature",
+   "lo": 80,
+   "hi": 104,
+   "unit": "\u00b0F",
+   "sets": "water_temperature"
+  },
+  {
+   "name": "set_ph",
+   "lo": 6.8,
+   "hi": 8.2,
+   "unit": "pH",
+   "sets": "ph_level"
+  },
+  {
+   "name": "increase_sanitizer",
+   "lo": 0,
+   "hi": 10,
+   "unit": "ppm",
+   "sets": "sanitizer_level"
+  },
+  {
+   "name": "set_jet_speed",
+   "lo": 0,
+   "hi": 3,
+   "unit": "speed",
+   "sets": "jet_pump_speed"
+  },
+  {
+   "name": "turn_on_ozone",
+   "lo": null,
+   "hi": null,
+   "unit": null,
+   "sets": null
+  }
+ ],
+ "utterances": [
+  {
+   "kind": "direct",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "turn_on_ozone",
+    "value": null
+   },
+   "say": "turn on the ozone",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "ozone on",
+   "source": "same",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "please turn on the ozone",
+   "source": "same",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "fire up the ozone",
+   "source": "same",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "activate ozone generator",
+   "source": "same",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "turn off the ozone",
+   "source": "flip",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "action": "set_jet_speed",
+   "value": 2,
+   "agree": true,
+   "replay": {
+    "action": "set_jet_speed",
+    "value": 2
+   },
+   "say": "set jet speed to 2",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "jets at 2",
+   "source": "same",
+   "action": "set_jet_speed",
+   "value": 2,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "please set jet speed to 2",
+   "source": "same",
+   "action": "set_jet_speed",
+   "value": 2,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "put the jets on 2",
+   "source": "same",
+   "action": "set_jet_speed",
+   "value": 2,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "set the jet pump to 2",
+   "source": "same",
+   "action": "set_jet_speed",
+   "value": 2,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "set jet speed to 3",
+   "source": "flip",
+   "action": "set_jet_speed",
+   "value": 3,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "action": "increase_sanitizer",
+   "value": 3.0,
+   "agree": true,
+   "replay": {
+    "action": "increase_sanitizer",
+    "value": 3.25
+   },
+   "say": "bump the sanitizer up a bit",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "sanitizer up a bit",
+   "source": "same",
+   "action": "increase_sanitizer",
+   "value": 3.25,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "please bump sanitizer a little",
+   "source": "same",
+   "action": "increase_sanitizer",
+   "value": 3.25,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "add a bit more sanitizer",
+   "source": "same",
+   "action": "increase_sanitizer",
+   "value": 3.25,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "nudge the sanitizer up",
+   "source": "same",
+   "action": "increase_sanitizer",
+   "value": 3.25,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "bump the sanitizer up a lot",
+   "source": "flip",
+   "action": "increase_sanitizer",
+   "value": 4.5,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "action": "increase_sanitizer",
+   "value": 6.5,
+   "agree": true,
+   "replay": {
+    "action": "increase_sanitizer",
+    "value": 6.5
+   },
+   "say": "make the sanitizer way stronger",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "sanitizer way stronger",
+   "source": "same",
+   "action": "increase_sanitizer",
+   "value": 6.5,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "please make the sanitizer much stronger",
+   "source": "same",
+   "action": "increase_sanitizer",
+   "value": 6.5,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "crank the sanitizer a lot",
+   "source": "same",
+   "action": "increase_sanitizer",
+   "value": 6.5,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "boost sanitizer big time",
+   "source": "same",
+   "action": "increase_sanitizer",
+   "value": 6.5,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "make the sanitizer a bit stronger",
+   "source": "flip",
+   "action": "increase_sanitizer",
+   "value": 3.25,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "action": "set_temperature",
+   "value": 103,
+   "agree": true,
+   "replay": {
+    "action": "set_temperature",
+    "value": 104
+   },
+   "say": "the water feels too cool",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "water is too cool",
+   "source": "same",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "please make the water warmer",
+   "source": "same",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "heat the water up",
+   "source": "same",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "water needs to be hotter",
+   "source": "same",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "the water feels too warm",
+   "source": "flip",
+   "action": "set_temperature",
+   "value": 80,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "replay": {
+    "action": "set_temperature",
+    "value": 104
+   },
+   "say": "i want it hotter",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "make it hotter",
+   "source": "same",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "please heat it up",
+   "source": "same",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "warmer please",
+   "source": "same",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "turn up the heat",
+   "source": "same",
+   "action": "set_temperature",
+   "value": 104,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "i want it cooler",
+   "source": "flip",
+   "action": "set_temperature",
+   "value": 80,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "action": "set_jet_speed",
+   "value": 3,
+   "agree": true,
+   "replay": {
+    "action": "set_jet_speed",
+    "value": 3
+   },
+   "say": "crank up the bubbles",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "crank the bubbles",
+   "source": "same",
+   "action": "set_jet_speed",
+   "value": 3,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "please turn up the bubbles",
+   "source": "same",
+   "action": "set_jet_speed",
+   "value": 3,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "max out the jets",
+   "source": "same",
+   "action": "set_jet_speed",
+   "value": 3,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "more bubbles please",
+   "source": "same",
+   "action": "set_jet_speed",
+   "value": 3,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "turn down the bubbles",
+   "source": "flip",
+   "action": "set_jet_speed",
+   "value": 0,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "what's the ph right now?",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "what is the ph?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "tell me the ph level",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "ph reading?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "can you check ph",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "set ph to 7.4",
+   "source": "flip",
+   "action": "set_ph",
+   "value": 7.4,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "play some jazz music",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "play jazz",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "please play jazz music",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "put on some jazz",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "jazz tunes please",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "stop the jazz music",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "turn on the underwater light",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "underwater light on",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "please turn on the underwater light",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "switch on the underwater light",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "light up the pool",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "turn off the underwater light",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "jet_pump_speed",
+    "up": true
+   },
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "make the jets even stronger",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "make jets stronger",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "jet_pump_speed",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "please increase jet power",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "jet_pump_speed",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "more jet power",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "jet_pump_speed",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "boost the jets",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "jet_pump_speed",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "make the jets weaker",
+   "source": "flip",
+   "action": "set_jet_speed",
+   "value": 0,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "turn_on_ozone",
+    "value": null
+   },
+   "say": "turn on ozone",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "ozone on",
+   "source": "same",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "please turn on ozone",
+   "source": "same",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "start the ozone",
+   "source": "same",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "enable ozone generator",
+   "source": "same",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "turn off ozone",
+   "source": "flip",
+   "action": "turn_on_ozone",
+   "value": null,
+   "agree": null,
+   "flag": null
+  }
+ ],
+ "problems": [],
+ "model": "deepseek/deepseek-v4.1-flash"
+}

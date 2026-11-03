@@ -1,0 +1,806 @@
+{
+ "setting": "Crude unit charge heater",
+ "about": "A refinery operator monitors the fired heater that preheats crude oil and adjusts fuel gas flow and air dampers to hold the outlet temperature.",
+ "area": "an oil refinery",
+ "state": [
+  {
+   "name": "crude_outlet_temp",
+   "value": 352,
+   "lo": 0,
+   "hi": 450,
+   "unit": "degC"
+  },
+  {
+   "name": "fuel_gas_flow",
+   "value": 42,
+   "lo": 0,
+   "hi": 100,
+   "unit": "percent"
+  },
+  {
+   "name": "air_damper_position",
+   "value": 55,
+   "lo": 0,
+   "hi": 100,
+   "unit": "percent"
+  },
+  {
+   "name": "stack_draft",
+   "value": -12,
+   "lo": -30,
+   "hi": 0,
+   "unit": "mmH2O"
+  },
+  {
+   "name": "burner_flame_status",
+   "value": 1,
+   "lo": 0,
+   "hi": 1,
+   "unit": "on/off"
+  },
+  {
+   "name": "ambient_temp",
+   "value": 28,
+   "lo": -10,
+   "hi": 50,
+   "unit": "degC"
+  }
+ ],
+ "actions": [
+  {
+   "name": "set_crude_outlet_temp",
+   "lo": 0,
+   "hi": 450,
+   "unit": "degC",
+   "sets": "crude_outlet_temp"
+  },
+  {
+   "name": "set_fuel_gas_flow",
+   "lo": 0,
+   "hi": 100,
+   "unit": "percent",
+   "sets": "fuel_gas_flow"
+  },
+  {
+   "name": "set_air_damper_position",
+   "lo": 0,
+   "hi": 100,
+   "unit": "percent",
+   "sets": "air_damper_position"
+  },
+  {
+   "name": "turn_on_burner_flame",
+   "lo": null,
+   "hi": null,
+   "unit": null,
+   "sets": "burner_flame_status"
+  },
+  {
+   "name": "turn_off_burner_flame",
+   "lo": null,
+   "hi": null,
+   "unit": null,
+   "sets": "burner_flame_status"
+  }
+ ],
+ "utterances": [
+  {
+   "kind": "direct",
+   "action": "turn_on_burner_flame",
+   "value": 1,
+   "agree": true,
+   "replay": {
+    "action": "turn_on_burner_flame",
+    "value": null
+   },
+   "say": "turn on the burner flame",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "ignite the burner flame",
+   "source": "same",
+   "action": "turn_on_burner_flame",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "start the burner",
+   "source": "same",
+   "action": "turn_on_burner_flame",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "light the burner flame",
+   "source": "same",
+   "action": "turn_on_burner_flame",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "turn the burner flame on",
+   "source": "same",
+   "action": "turn_on_burner_flame",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "turn off the burner flame",
+   "source": "flip",
+   "action": "turn_off_burner_flame",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "action": "set_crude_outlet_temp",
+   "value": 370,
+   "agree": true,
+   "replay": {
+    "action": "set_crude_outlet_temp",
+    "value": 370
+   },
+   "say": "set crude outlet temperature to 370 degc",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "set outlet temp to 370",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 370,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "make crude outlet 370 degc",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 370,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "crude outlet temperature 370",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 370,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "adjust outlet temperature to 370 degc",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 370,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "set crude outlet temperature to 330 degc",
+   "source": "flip",
+   "action": "set_crude_outlet_temp",
+   "value": 330,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "action": "set_air_damper_position",
+   "value": 60,
+   "agree": true,
+   "replay": {
+    "action": "set_air_damper_position",
+    "value": 62
+   },
+   "say": "open the air damper a bit more",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "open the air damper slightly more",
+   "source": "same",
+   "action": "set_air_damper_position",
+   "value": 62,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "increase air damper a little",
+   "source": "same",
+   "action": "set_air_damper_position",
+   "value": 62,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "crack the air damper open a bit",
+   "source": "same",
+   "action": "set_air_damper_position",
+   "value": 62,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "air damper a bit more open",
+   "source": "same",
+   "action": "set_air_damper_position",
+   "value": 62,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "close the air damper a bit",
+   "source": "flip",
+   "action": "set_air_damper_position",
+   "value": 48,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "action": "set_fuel_gas_flow",
+   "value": 64,
+   "agree": true,
+   "replay": {
+    "action": "set_fuel_gas_flow",
+    "value": 86
+   },
+   "say": "increase fuel gas flow way more",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "increase fuel gas flow a lot",
+   "source": "same",
+   "action": "set_fuel_gas_flow",
+   "value": 86,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "raise the gas flow a lot",
+   "source": "same",
+   "action": "set_fuel_gas_flow",
+   "value": 86,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "fuel gas flow up a lot",
+   "source": "same",
+   "action": "set_fuel_gas_flow",
+   "value": 86,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "push fuel gas flow up substantially",
+   "source": "same",
+   "action": "set_fuel_gas_flow",
+   "value": 86,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "decrease fuel gas flow a lot",
+   "source": "flip",
+   "action": "set_fuel_gas_flow",
+   "value": 8,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "action": "set_crude_outlet_temp",
+   "value": 327,
+   "agree": true,
+   "replay": {
+    "action": "set_crude_outlet_temp",
+    "value": 325
+   },
+   "say": "the crude outlet is too hot",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "lower the crude outlet temperature",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 325,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "crude outlet is too hot, cool it down",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 325,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "reduce outlet temperature",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 325,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "make the crude outlet cooler",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 325,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "the crude outlet is too cold",
+   "source": "flip",
+   "action": "set_crude_outlet_temp",
+   "value": 380,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "action": "set_crude_outlet_temp",
+   "value": 377,
+   "agree": true,
+   "replay": {
+    "action": "set_crude_outlet_temp",
+    "value": 372
+   },
+   "say": "i want the crude outlet hotter",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "hotter crude outlet please",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 372,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "increase the crude outlet temperature",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 372,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "make the outlet hotter",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 372,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "raise crude outlet temp",
+   "source": "same",
+   "action": "set_crude_outlet_temp",
+   "value": 372,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "i want the crude outlet cooler",
+   "source": "flip",
+   "action": "set_crude_outlet_temp",
+   "value": 332,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "action": "set_fuel_gas_flow",
+   "value": 48,
+   "agree": true,
+   "replay": {
+    "action": "set_fuel_gas_flow",
+    "value": 47
+   },
+   "say": "crank the gas juice up a bit",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "increase gas flow a bit",
+   "source": "same",
+   "action": "set_fuel_gas_flow",
+   "value": 47,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "bump the fuel gas a little",
+   "source": "same",
+   "action": "set_fuel_gas_flow",
+   "value": 47,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "gas juice up slightly",
+   "source": "same",
+   "action": "set_fuel_gas_flow",
+   "value": 47,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "raise fuel gas flow a bit",
+   "source": "same",
+   "action": "set_fuel_gas_flow",
+   "value": 47,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "crank the gas juice down a bit",
+   "source": "flip",
+   "action": "set_fuel_gas_flow",
+   "value": 37,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "what's the stack draft reading?",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "what is the stack draft?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "stack draft reading?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "tell me the stack draft",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "how much stack draft?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "set the stack draft to -15",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "play some music",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "put on some tunes",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "music please",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "can you play music?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "start some music",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "turn on the burner flame",
+   "source": "flip",
+   "action": "turn_on_burner_flame",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "set the feed rate to 100 barrels per hour",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "set feed rate to 100 barrels per hour",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "feed rate 100 barrels per hour",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "make feed rate 100 barrels per hour",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "adjust feed rate to 100 barrels per hour",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "set the feed rate to 50 barrels per hour",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "crude_outlet_temp",
+    "up": true
+   },
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "make the outlet even hotter",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "make the outlet hotter still",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "crude_outlet_temp",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "increase outlet temperature even more",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "crude_outlet_temp",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "push the outlet temperature higher",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "crude_outlet_temp",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "raise outlet temp further",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "crude_outlet_temp",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "make the outlet cooler",
+   "source": "flip",
+   "action": "set_crude_outlet_temp",
+   "value": 332,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "action": "turn_off_burner_flame",
+   "value": 0,
+   "agree": true,
+   "replay": {
+    "action": "turn_off_burner_flame",
+    "value": null
+   },
+   "say": "shut off the burner flame",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "turn off the burner flame",
+   "source": "same",
+   "action": "turn_off_burner_flame",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "extinguish the burner flame",
+   "source": "same",
+   "action": "turn_off_burner_flame",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "stop the burner flame",
+   "source": "same",
+   "action": "turn_off_burner_flame",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "kill the burner flame",
+   "source": "same",
+   "action": "turn_off_burner_flame",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "turn on the burner flame",
+   "source": "flip",
+   "action": "turn_on_burner_flame",
+   "value": null,
+   "agree": null,
+   "flag": null
+  }
+ ],
+ "problems": [],
+ "model": "deepseek/deepseek-v4.1-flash"
+}

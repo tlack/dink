@@ -1,0 +1,820 @@
+{
+ "setting": "Atmospheric column reflux",
+ "about": "A process operator uses it to control product quality and energy use by adjusting reflux flow and overhead condenser cooling.",
+ "area": "oil distillery",
+ "state": [
+  {
+   "name": "reflux_flow_rate",
+   "value": 1200,
+   "lo": 800,
+   "hi": 2000,
+   "unit": "bbl/day"
+  },
+  {
+   "name": "overhead_temp",
+   "value": 135,
+   "lo": 80,
+   "hi": 180,
+   "unit": "F"
+  },
+  {
+   "name": "column_pressure",
+   "value": 15.2,
+   "lo": 8,
+   "hi": 25,
+   "unit": "psig"
+  },
+  {
+   "name": "condenser_cooling_duty",
+   "value": 45,
+   "lo": 20,
+   "hi": 90,
+   "unit": "MMBtu/hr"
+  },
+  {
+   "name": "ambient_temp",
+   "value": 78,
+   "lo": -20,
+   "hi": 120,
+   "unit": "F"
+  },
+  {
+   "name": "operator_battery_level",
+   "value": 0.88,
+   "lo": 0,
+   "hi": 1,
+   "unit": "on/off"
+  },
+  {
+   "name": "reflux_drum_level",
+   "value": 65,
+   "lo": 20,
+   "hi": 90,
+   "unit": "%"
+  }
+ ],
+ "actions": [
+  {
+   "name": "set_reflux_flow",
+   "lo": 800,
+   "hi": 2000,
+   "unit": "bbl/day",
+   "sets": "reflux_flow_rate"
+  },
+  {
+   "name": "set_condenser_cooling",
+   "lo": 20,
+   "hi": 90,
+   "unit": "MMBtu/hr",
+   "sets": "condenser_cooling_duty"
+  },
+  {
+   "name": "set_overhead_temp",
+   "lo": 80,
+   "hi": 180,
+   "unit": "F",
+   "sets": "overhead_temp"
+  },
+  {
+   "name": "set_column_pressure",
+   "lo": 8,
+   "hi": 25,
+   "unit": "psig",
+   "sets": "column_pressure"
+  },
+  {
+   "name": "start_reflux_pump",
+   "lo": null,
+   "hi": null,
+   "unit": null,
+   "sets": null
+  },
+  {
+   "name": "sound_high_temp_alarm",
+   "lo": null,
+   "hi": null,
+   "unit": null,
+   "sets": null
+  }
+ ],
+ "utterances": [
+  {
+   "kind": "direct",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "replay": {
+    "action": "set_reflux_flow",
+    "value": 1500
+   },
+   "say": "increase reflux to 1500 barrels per day",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "raise reflux to 1500 bbl/day",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "set reflux flow at 1500 barrels per day",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "bump reflux up to 1500 bbl/day",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "reflux flow to 1500 barrels per day please",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "lower reflux to 1500 barrels per day",
+   "source": "flip",
+   "action": "set_reflux_flow",
+   "value": 900,
+   "agree": null,
+   "flag": "says 1500, labeled 900"
+  },
+  {
+   "kind": "number",
+   "action": "set_overhead_temp",
+   "value": 125,
+   "agree": true,
+   "replay": {
+    "action": "set_overhead_temp",
+    "value": 125
+   },
+   "say": "set overhead temperature to 125 f",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "bring overhead temp to 125 f",
+   "source": "same",
+   "action": "set_overhead_temp",
+   "value": 125,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "overhead temperature down to 125 f",
+   "source": "same",
+   "action": "set_overhead_temp",
+   "value": 125,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "make overhead 125 f",
+   "source": "same",
+   "action": "set_overhead_temp",
+   "value": 125,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "set the overhead temp to 125 f please",
+   "source": "same",
+   "action": "set_overhead_temp",
+   "value": 125,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "raise overhead temperature to 125 f",
+   "source": "flip",
+   "action": "set_overhead_temp",
+   "value": 165,
+   "agree": null,
+   "flag": "says 125, labeled 165"
+  },
+  {
+   "kind": "relative_small",
+   "action": "set_reflux_flow",
+   "value": 1280,
+   "agree": true,
+   "replay": {
+    "action": "set_reflux_flow",
+    "value": 1320
+   },
+   "say": "a bit more reflux flow",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "nudge reflux flow up a touch",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1320,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "a little more reflux flow",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1320,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "slightly increase reflux flow",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1320,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "bump reflux flow up a bit",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1320,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "a bit less reflux flow",
+   "source": "flip",
+   "action": "set_reflux_flow",
+   "value": 1080,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "action": "set_condenser_cooling",
+   "value": 72,
+   "agree": true,
+   "replay": {
+    "action": "set_condenser_cooling",
+    "value": 83
+   },
+   "say": "way more condenser cooling",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "raise condenser cooling a lot",
+   "source": "same",
+   "action": "set_condenser_cooling",
+   "value": 83,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "much more condenser cooling",
+   "source": "same",
+   "action": "set_condenser_cooling",
+   "value": 83,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "crank condenser cooling way up",
+   "source": "same",
+   "action": "set_condenser_cooling",
+   "value": 83,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "increase condenser cooling by a lot",
+   "source": "same",
+   "action": "set_condenser_cooling",
+   "value": 83,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "a lot less condenser cooling",
+   "source": "flip",
+   "action": "set_condenser_cooling",
+   "value": 34,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "action": "set_column_pressure",
+   "value": 12,
+   "agree": true,
+   "replay": {
+    "action": "set_column_pressure",
+    "value": 11
+   },
+   "say": "the column pressure is creeping too high",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "column pressure is too high, bring it down",
+   "source": "same",
+   "action": "set_column_pressure",
+   "value": 11,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "lower the column pressure",
+   "source": "same",
+   "action": "set_column_pressure",
+   "value": 11,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "reduce column pressure",
+   "source": "same",
+   "action": "set_column_pressure",
+   "value": 11,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "column pressure is creeping too high, drop it",
+   "source": "same",
+   "action": "set_column_pressure",
+   "value": 11,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "the column pressure is too low",
+   "source": "flip",
+   "action": "set_column_pressure",
+   "value": 21,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "action": "set_overhead_temp",
+   "value": 150,
+   "agree": true,
+   "replay": {
+    "action": "set_overhead_temp",
+    "value": 150
+   },
+   "say": "i want the overhead hotter",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "make the overhead hotter",
+   "source": "same",
+   "action": "set_overhead_temp",
+   "value": 150,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "raise overhead temperature",
+   "source": "same",
+   "action": "set_overhead_temp",
+   "value": 150,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "i want the overhead warmer",
+   "source": "same",
+   "action": "set_overhead_temp",
+   "value": 150,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "bump overhead temp up",
+   "source": "same",
+   "action": "set_overhead_temp",
+   "value": 150,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "i want the overhead cooler",
+   "source": "flip",
+   "action": "set_overhead_temp",
+   "value": 115,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "replay": {
+    "action": "set_reflux_flow",
+    "value": 1500
+   },
+   "say": "crank up the reflux juice",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "crank up the reflux",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "turn up reflux flow",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "increase reflux flow",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "raise the reflux flow",
+   "source": "same",
+   "action": "set_reflux_flow",
+   "value": 1500,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "turn down the reflux",
+   "source": "flip",
+   "action": "set_reflux_flow",
+   "value": 1000,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "what's the reflux drum level?",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "what is the reflux drum level?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "tell me the reflux drum level",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "how full is the reflux drum?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "reflux drum level reading?",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "set reflux drum level to 65 percent",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "order more lab sample bottles",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "order more sample bottles",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "we need more lab sample bottles",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "get more lab sample bottles",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "place an order for more lab sample bottles",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "cancel the lab sample bottle order",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "turn on the feed preheater",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "start the feed preheater",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "turn the feed preheater on",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "switch on the feed preheater",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "activate the feed preheater",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "turn off the feed preheater",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "reflux_flow_rate",
+    "up": true
+   },
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "even more reflux flow",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "more reflux flow",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "reflux_flow_rate",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "increase reflux flow further",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "reflux_flow_rate",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "push reflux flow higher",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "reflux_flow_rate",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "raise reflux flow even more",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "reflux_flow_rate",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "less reflux flow",
+   "source": "flip",
+   "action": "set_reflux_flow",
+   "value": 1000,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "action": "start_reflux_pump",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "start_reflux_pump",
+    "value": null
+   },
+   "say": "start the reflux pump",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "turn on the reflux pump",
+   "source": "same",
+   "action": "start_reflux_pump",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "switch on the reflux pump",
+   "source": "same",
+   "action": "start_reflux_pump",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "activate the reflux pump",
+   "source": "same",
+   "action": "start_reflux_pump",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "get the reflux pump going",
+   "source": "same",
+   "action": "start_reflux_pump",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "stop the reflux pump",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  }
+ ],
+ "problems": [],
+ "model": "deepseek/deepseek-v4.1-flash"
+}

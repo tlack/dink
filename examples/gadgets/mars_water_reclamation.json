@@ -1,0 +1,806 @@
+{
+ "setting": "Mars Habitat Water Reclamation System",
+ "about": "Mission engineers use it to control filtration rate and heating elements based on water quality, tank level, and system pressure.",
+ "area": "mars habitat",
+ "state": [
+  {
+   "name": "filtration_rate",
+   "value": 12,
+   "lo": 0,
+   "hi": 50,
+   "unit": "L/min"
+  },
+  {
+   "name": "heater_temperature",
+   "value": 22,
+   "lo": 5,
+   "hi": 60,
+   "unit": "\u00b0C"
+  },
+  {
+   "name": "tank_level",
+   "value": 75,
+   "lo": 0,
+   "hi": 100,
+   "unit": "%"
+  },
+  {
+   "name": "system_pressure",
+   "value": 2.1,
+   "lo": 0.5,
+   "hi": 5.0,
+   "unit": "bar"
+  },
+  {
+   "name": "water_quality_index",
+   "value": 82,
+   "lo": 0,
+   "hi": 100,
+   "unit": "WQI"
+  },
+  {
+   "name": "solar_panel_output",
+   "value": 410,
+   "lo": 0,
+   "hi": 1200,
+   "unit": "W"
+  }
+ ],
+ "actions": [
+  {
+   "name": "set_filtration_rate",
+   "lo": 0,
+   "hi": 50,
+   "unit": "L/min",
+   "sets": "filtration_rate"
+  },
+  {
+   "name": "set_heater_temperature",
+   "lo": 5,
+   "hi": 60,
+   "unit": "\u00b0C",
+   "sets": "heater_temperature"
+  },
+  {
+   "name": "set_system_pressure",
+   "lo": 0.5,
+   "hi": 5.0,
+   "unit": "bar",
+   "sets": "system_pressure"
+  },
+  {
+   "name": "start_water_reclamation",
+   "lo": null,
+   "hi": null,
+   "unit": null,
+   "sets": null
+  },
+  {
+   "name": "stop_water_reclamation",
+   "lo": null,
+   "hi": null,
+   "unit": null,
+   "sets": null
+  }
+ ],
+ "utterances": [
+  {
+   "kind": "direct",
+   "action": "start_water_reclamation",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "start_water_reclamation",
+    "value": null
+   },
+   "say": "turn on the reclamation system",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "start the water reclamation",
+   "source": "same",
+   "action": "start_water_reclamation",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "begin reclamation now",
+   "source": "same",
+   "action": "start_water_reclamation",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "get the reclamation going",
+   "source": "same",
+   "action": "start_water_reclamation",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "could you turn on reclamation",
+   "source": "same",
+   "action": "start_water_reclamation",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "direct",
+   "say": "shut down the reclamation system",
+   "source": "flip",
+   "action": "stop_water_reclamation",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "action": "set_filtration_rate",
+   "value": 30,
+   "agree": true,
+   "replay": {
+    "action": "set_filtration_rate",
+    "value": 30
+   },
+   "say": "set filtration rate to 30 liters per minute",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "set filtration to 30",
+   "source": "same",
+   "action": "set_filtration_rate",
+   "value": 30,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "filtration rate 30 l/min",
+   "source": "same",
+   "action": "set_filtration_rate",
+   "value": 30,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "make filtration 30 liters per minute",
+   "source": "same",
+   "action": "set_filtration_rate",
+   "value": 30,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "can you put filtration at 30",
+   "source": "same",
+   "action": "set_filtration_rate",
+   "value": 30,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "number",
+   "say": "set filtration rate to 45 liters per minute",
+   "source": "flip",
+   "action": "set_filtration_rate",
+   "value": 45,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "action": "set_heater_temperature",
+   "value": 25,
+   "agree": true,
+   "replay": {
+    "action": "set_heater_temperature",
+    "value": 25
+   },
+   "say": "make the water a bit warmer",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "warm the water a little",
+   "source": "same",
+   "action": "set_heater_temperature",
+   "value": 25,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "nudge the heater up slightly",
+   "source": "same",
+   "action": "set_heater_temperature",
+   "value": 25,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "make it a bit warmer",
+   "source": "same",
+   "action": "set_heater_temperature",
+   "value": 25,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "increase water temp just a touch",
+   "source": "same",
+   "action": "set_heater_temperature",
+   "value": 25,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_small",
+   "say": "make the water a bit cooler",
+   "source": "flip",
+   "action": "set_heater_temperature",
+   "value": 19,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "action": "set_system_pressure",
+   "value": 3.3,
+   "agree": true,
+   "replay": {
+    "action": "set_system_pressure",
+    "value": 4.2
+   },
+   "say": "increase pressure way more",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "raise pressure a lot",
+   "source": "same",
+   "action": "set_system_pressure",
+   "value": 4.2,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "bump pressure way up",
+   "source": "same",
+   "action": "set_system_pressure",
+   "value": 4.2,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "increase system pressure significantly",
+   "source": "same",
+   "action": "set_system_pressure",
+   "value": 4.2,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "crank the pressure up high",
+   "source": "same",
+   "action": "set_system_pressure",
+   "value": 4.2,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "relative_big",
+   "say": "lower pressure a lot",
+   "source": "flip",
+   "action": "set_system_pressure",
+   "value": 1.0,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "action": "set_system_pressure",
+   "value": 2.6,
+   "agree": true,
+   "replay": {
+    "action": "set_system_pressure",
+    "value": 3.3
+   },
+   "say": "the system pressure is too low",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "pressure is too low, fix it",
+   "source": "same",
+   "action": "set_system_pressure",
+   "value": 3.3,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "raise the system pressure",
+   "source": "same",
+   "action": "set_system_pressure",
+   "value": 3.3,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "the system pressure needs to be higher",
+   "source": "same",
+   "action": "set_system_pressure",
+   "value": 3.3,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "increase pressure please",
+   "source": "same",
+   "action": "set_system_pressure",
+   "value": 3.3,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "complaint",
+   "say": "the system pressure is too high",
+   "source": "flip",
+   "action": "set_system_pressure",
+   "value": 1.4,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "action": "set_filtration_rate",
+   "value": 9,
+   "agree": true,
+   "replay": {
+    "action": "set_filtration_rate",
+    "value": 7
+   },
+   "say": "i want the filtration rate lower",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "lower the filtration rate",
+   "source": "same",
+   "action": "set_filtration_rate",
+   "value": 7,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "reduce filtration",
+   "source": "same",
+   "action": "set_filtration_rate",
+   "value": 7,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "make filtration slower",
+   "source": "same",
+   "action": "set_filtration_rate",
+   "value": 7,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "decrease the filtration rate",
+   "source": "same",
+   "action": "set_filtration_rate",
+   "value": 7,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "desire",
+   "say": "i want the filtration rate higher",
+   "source": "flip",
+   "action": "set_filtration_rate",
+   "value": 22,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "action": "set_heater_temperature",
+   "value": 30,
+   "agree": true,
+   "replay": {
+    "action": "set_heater_temperature",
+    "value": 45
+   },
+   "say": "crank up the heat on the water heater",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "turn up the water heater",
+   "source": "same",
+   "action": "set_heater_temperature",
+   "value": 45,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "increase heater temperature a lot",
+   "source": "same",
+   "action": "set_heater_temperature",
+   "value": 45,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "make the heater hotter",
+   "source": "same",
+   "action": "set_heater_temperature",
+   "value": 45,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "raise the heat on the water heater",
+   "source": "same",
+   "action": "set_heater_temperature",
+   "value": 45,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "slang",
+   "say": "turn down the water heater",
+   "source": "flip",
+   "action": "set_heater_temperature",
+   "value": 12,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "what's the tank level right now",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "how full is the tank",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "what's the current tank level",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "tell me the tank level",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "tank level status",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "question",
+   "say": "set tank level to 50 percent",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "play some music in the habitat",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "put on some music",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "start music in the habitat",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "can we have music",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "play a song here",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "unrelated",
+   "say": "turn off the music",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "open the airlock door",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "unlock the airlock door",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "open airlock",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "let me through the airlock",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "airlock door open please",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "missing",
+   "say": "close the airlock door",
+   "source": "flip",
+   "action": "none",
+   "value": null,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "filtration_rate",
+    "up": true
+   },
+   "replay": {
+    "action": "none",
+    "value": null
+   },
+   "say": "make the filtration even faster",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "make filtration faster still",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "filtration_rate",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "increase filtration even more",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "filtration_rate",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "can filtration go higher",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "filtration_rate",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "push filtration up further",
+   "source": "same",
+   "action": "none",
+   "value": null,
+   "agree": true,
+   "limit": {
+    "field": "filtration_rate",
+    "up": true
+   },
+   "flag": null
+  },
+  {
+   "kind": "limit",
+   "say": "make the filtration even slower",
+   "source": "flip",
+   "action": "set_filtration_rate",
+   "value": 7,
+   "agree": null,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "action": "stop_water_reclamation",
+   "value": null,
+   "agree": true,
+   "replay": {
+    "action": "stop_water_reclamation",
+    "value": null
+   },
+   "say": "stop the reclamation process",
+   "source": "request",
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "stop reclamation",
+   "source": "same",
+   "action": "stop_water_reclamation",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "end the reclamation process",
+   "source": "same",
+   "action": "stop_water_reclamation",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "shut off water reclamation",
+   "source": "same",
+   "action": "stop_water_reclamation",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "turn off reclamation",
+   "source": "same",
+   "action": "stop_water_reclamation",
+   "value": null,
+   "agree": true,
+   "flag": null
+  },
+  {
+   "kind": "no_value",
+   "say": "start the reclamation process",
+   "source": "flip",
+   "action": "start_water_reclamation",
+   "value": null,
+   "agree": null,
+   "flag": null
+  }
+ ],
+ "problems": [],
+ "model": "deepseek/deepseek-v4.1-flash"
+}
