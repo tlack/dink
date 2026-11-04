@@ -48,3 +48,13 @@ def test_released_model(model, prompt, name, value):
         assert r["pick"].name == name
         if value is not None:
             assert r["pick"].value == value
+
+
+def test_pass1_whole_steps_both_ways():
+    """0..3 at 1: the 35% step down (0.65) rounds back to 1; pass 1 must still offer 0."""
+    from dink.harness import pass1_tools
+    g = {"state": [{"name": "jet_pump_speed", "value": 1, "lo": 0, "hi": 3}],
+         "actions": [{"name": "set_jet_speed", "lo": 0, "hi": 3, "sets": "jet_pump_speed"}]}
+    assert sorted(t.value for t in pass1_tools(None, g, "more jets")) == [0, 2]
+    g["state"][0]["value"] = 2                 # the step up (2.35) rounds back to 2: offer 3
+    assert sorted(t.value for t in pass1_tools(None, g, "more jets")) == [1, 3]

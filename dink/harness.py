@@ -110,7 +110,10 @@ def pass1_tools(model, gadget, prompt):
             for up in (True, False):
                 room = (a["hi"] - cur) if up else (cur - a["lo"])
                 if room > 1e-9:
-                    vals.append(nice(cur + (1 if up else -1) * 0.35 * room, a["lo"], a["hi"], whole))
+                    v = nice(cur + (1 if up else -1) * 0.35 * room, a["lo"], a["hi"], whole)
+                    if whole and abs(v - cur) < 1e-9 and room >= 1:
+                        v = cur + (1 if up else -1)      # 0..3 at 1: 0.65 rounds back to 1; offer 0
+                    vals.append(v)
         vals = list(dict.fromkeys(v for v in vals if cur is None or abs(v - cur) > 1e-9))
         groups.append((a, [Field(a["name"], v, a["lo"], a["hi"]) for v in vals]))
     if sum(len(g) for _, g in groups) > MAX_SLOTS:  # keep the actions whose names match the request best
