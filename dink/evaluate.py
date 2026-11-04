@@ -20,7 +20,8 @@ def main():
     a = ap.parse_args()
     ck = torch.load(Path(a.run) / "model.pt", weights_only=True, map_location=a.device)
     model = Dink(width=ck["args"]["width"], scenario=ck["args"].get("scenario", False),
-                 raw_magnitude=ck["args"].get("raw_magnitude", True)).to(a.device)
+                 raw_magnitude=ck["args"].get("raw_magnitude", True),
+                 loops=ck["args"].get("loops", 1), inject=not ck["args"].get("no_inject", False)).to(a.device)
     model.load_state_dict(ck["state"])
     print(f"{'set':16s} {'best':>6s} {'ok':>6s} {'p(right)':>9s} {'nothing P/R':>12s}")
     fill = None

@@ -467,3 +467,69 @@ Readings:
   71, was wanted.
 - Held-out sets flat to slightly up (within noise); HA dips 2.5 points (watch).
 - Weakest kinds in unseen areas: inverted reframes 0.65, complaints 0.72, desires 0.80.
+
+## 2026-11-03: request-to-name matching, encoder anchor, looped mixer (v14)
+
+Trigger: on the example hot tub, "more jets" never picks `set_jet_speed` (0..3, at 1).
+
+**Matching probe** (`dink/teacher/matching.py`): does a request's nearest action name (query-0
+cosine) match its LLM label? LLM worlds, held out exactly as split_v13 (areas: 3,603 requests;
+worlds: 2,418), plus 10 hot tub requests.
+
+| encoder | held-out areas | held-out worlds | hot tub |
+|---|---|---|---|
+| Qwen3-Embedding-0.6B (teacher) | 0.880 | 0.891 | 10/10 |
+| tv128 (distilled, before Dink training) | 0.788 | 0.805 | 10/10 |
+| dink-v13's encoder | 0.849 | 0.849 | 5/10 |
+
+Dink training improves matching overall but forgets some words ("jets", "heat").
+
+**Runs** (v13's recipe, 40k steps, rented RTX 6000 Ada):
+- `v14_anchor`: + the distillation loss on the teacher corpus (0.5) and a request-to-name
+  matching loss (0.5: per request, KL to the teacher's softmax over its world's names, T=0.05).
+- `v14_loop`: the mixer looped up to 4x with shared weights, after arXiv 2610.12582 (NVIDIA):
+  pass 1 is the plain mixer; later passes re-add the input, take a zero-initialized
+  (pass, budget) scale/shift, and move the state a gated step toward the mixer output.
+  Training draws 1-4 passes per step. 211K parameters.
+- `v14_loop_noinj`: the same without re-adding the input.
+
+| set | v13 | anchor | loop | loop, no inject |
+|---|---|---|---|---|
+| val | 0.961 | 0.957 | 0.963 | 0.963 |
+| test_areas | 0.906 | 0.904 | 0.902 | 0.902 |
+| test_worlds | 0.904 | 0.904 | 0.900 | 0.906 |
+| test_words | 0.820 | 0.846 | 0.856 | 0.838 |
+| test_llm | 0.862 | 0.858 | 0.810 | 0.834 |
+| test_ha / test_ha_unseen | 0.939 / 0.769 | 0.967 / 0.703 | 0.953 / 0.648 | 0.954 / 0.747 |
+| hard cases (38) | 37 | 32 | 37 | 38 |
+| matching: areas / hot tub | 0.849 / 5 | **0.877 / 10** | 0.856 / 8 | 0.841 / 7 |
+
+Looped models at fewer passes (same weights): test_areas 0.904 / 0.900 / 0.902 / 0.902 at
+1-4 passes; val 0.958 -> 0.963. **Looping does nothing here**: the mixer is not short of
+compute; the misses are knowledge (words, names), which more passes can't supply. Re-adding
+the input makes no difference either, as 2610.12582 reports. Not pursued (it would cost
+ESP32 time for nothing).
+
+The anchor keeps the encoder's matching (hot tub 10/10) but the full model still sends "more
+jets" to the sanitizer. Why, found by holding everything else fixed (anchor model, jets at 1
+of 0..3):
+
+| jet options offered | p(jets) for "more jets" |
+|---|---|
+| [2] (what the harness offered) | 0.00 |
+| [2, 3] | 0.30 |
+| [2, 0] | 0.94 |
+
+**The option-count shortcut is back, inverted.** Since 2026-09-27 training offers the right
+action in balanced pairs (as many options up as down), so the model learned "an action
+offered once, or lopsided, is not the answer". On whole-number ranges the harness's 35% step
+rounds back to the current value (0..3 at 1: 0.65 -> 1) and is dropped, leaving one option.
+And "less jets" (1 -> 0, the only way down, a full move) loses to a moderate move on another
+device: graded targets give an off-size move on the right action 0, the same as a wrong one.
+
+Fixes: the harness now keeps a 1-unit step each way on whole-number ranges (v13: "crank the
+jets up" and "faster jets" now right; examples 170 -> 175 of 288 matching the LLM label).
+Training options for v15 (`dink/data/direction.py`): `--dir-credit` (right action, right
+direction gets at least 0.25 of the best weight, unless the request says a number), `--thin`
+(one action, right or distractor, keeps only some options), and a `dir` score in every
+evaluation (right action and direction).

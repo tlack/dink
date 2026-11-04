@@ -10,6 +10,18 @@ up); the log line shows the GPU temperature, since long runs have overheated thi
 
 Each step draws base examples and augments them afresh (dink/gen/augment.py). Loss: cross
 entropy against the (possibly split) target distribution over 8 tools + nothing relevant.
+
+Options added for v14 experiments:
+  --anchor W   keep the text encoder near the teacher while Dink trains: the distillation
+               loss on the teacher corpus (dink/teacher/distill.py), weight W
+  --match W    and the teacher's request-to-name rankings over LLM-world names
+               (dink/teacher/matching.py; held-out areas and worlds never used), weight W
+  --dir-credit F  options on the right action in the right direction get at least F of the
+               best option's weight (dink/data/direction.py); requests with numbers excepted
+  --thin P     in a share P of draws, one action keeps only some of its options, so how
+               many options an action has says nothing about whether it's the answer
+  --loops K    run the mixer up to K times (dink/model/dink.py Loop); each step trains a
+               random count from 1 to K; --no-inject leaves out re-adding the mixer input
 """
 import argparse
 import collections
@@ -20,14 +32,17 @@ import subprocess
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 
 from .data.collate import collate
+from .data.direction import credit_direction, right_direction, thin_options
 from .data.scenario import Scenario
 from .evals.nostate import nostate_tests, state_free, strip_state
 from .gen import augment as A
 from .model.dink import SLOTS, Dink
+from .model.text import to_bytes
 
 
 def load(path):
@@ -53,8 +68,9 @@ def is_nothing(s):
 class Batches(torch.utils.data.IterableDataset):
     """Endless augmented, collated batches; each worker has its own random stream."""
 
-    def __init__(self, train, batch, seed, scenario_drop=0.0, no_state=0.0, mix=None):
+    def __init__(self, train, batch, seed, scenario_drop=0.0, no_state=0.0, mix=None, thin=0.0):
         self.train, self.batch, self.seed, self.scenario_drop = train, batch, seed, scenario_drop
+        self.thin = thin
         self.no_state = no_state
         self.groups, self.weights = None, None
         if mix:                                 # fixed share of each batch per source
@@ -67,6 +83,8 @@ class Batches(torch.utils.data.IterableDataset):
     def draw(self, rng):
         pool = rng.choices(self.groups, self.weights)[0] if self.groups else self.train
         s = A.augment(rng.choice(pool), rng)
+        if self.thin and rng.random() < self.thin:
+            s = thin_options(s, rng)
         if self.no_state and s.state and state_free(s) and rng.random() < self.no_state:
             s = strip_state(s)                  # prompt-only: only where the answer can't depend on state
         if s.scenario and rng.random() < self.scenario_drop:     # the model must work without one too
@@ -94,6 +112,65 @@ def source_of(s):
     """Data source, for --mix: the smart home generator, LLM worlds, or Home Assistant."""
     intent = s.meta.get("intent")
     return "ha" if intent == "ha" else "world" if intent == "world" else "home"
+
+
+class Anchor:
+    """Teacher targets for the text encoder during Dink training (--anchor, --match)."""
+
+    def __init__(self, ckpt, dev, rng, match=False):
+        from .teacher.distill import noisy
+        from .teacher import matching as M
+        self.dev, self.rng, self.noisy, self.spaced = dev, rng, noisy, M.spaced
+        ck = torch.load(ckpt, weights_only=False)
+        mu, W = ck["pca_mu"], ck["pca_W"]
+        rows = [json.loads(l) for l in Path("data/teacher/corpus.jsonl").read_text().splitlines()]
+        E = np.load("data/teacher/teacher.npy").astype(np.float32)
+        keep = [k for k, r in enumerate(rows) if r["split"] == "train"]
+        self.texts = [rows[k]["text"] for k in keep]
+        Z = (E[keep] - mu) @ W
+        self.Z = torch.from_numpy((Z / np.linalg.norm(Z, axis=1, keepdims=True)).astype(np.float32)).to(dev)
+        self.E = torch.from_numpy(E[keep]).to(dev)
+        self.groups = None
+        if match:
+            meta, ME = M.load()
+            self.idx = {t: i for i, t in enumerate(meta["texts"])}
+            self.ME = torch.from_numpy(ME).to(dev)
+            self.groups = [g for g in meta["groups"] if g["split"] == "train"]
+
+    def emb(self, text, texts):
+        return F.normalize(text(to_bytes(texts).to(self.dev))[:, 0], dim=-1)
+
+    def corpus_loss(self, text, n=256):
+        """distill.py's loss: cosine to the teacher's PCA vector + similarity structure."""
+        idx = self.rng.sample(range(len(self.texts)), n)
+        s = self.emb(text, [self.noisy(self.texts[k], self.rng) for k in idx])
+        e = self.E[idx]
+        return (1 - (s * self.Z[idx]).sum(-1)).mean() + F.mse_loss(s @ s.T, e @ e.T)
+
+    def match_loss(self, text, n_groups=32, per=8, temp=0.05):
+        """For each request, the student's softmax over its world's names should match the
+        teacher's (KL). Names go in as written (snake_case etc.); the teacher saw them spaced."""
+        reqs, names, spans = [], [], []
+        for g in self.rng.sample(self.groups, n_groups):
+            rs = self.rng.sample(g["requests"], min(per, len(g["requests"])))
+            spans.append((len(reqs), len(reqs) + len(rs), len(names), len(names) + len(g["names"])))
+            reqs += [r["say"] for r in rs]
+            names += g["names"]
+        R, N = self.emb(text, [self.noisy(t, self.rng) for t in reqs]), self.emb(text, names)
+        TR = self.ME[[self.idx[t] for t in reqs]]
+        TN = self.ME[[self.idx[self.spaced(t)] for t in names]]
+        loss = 0.0
+        for r0, r1, n0, n1 in spans:
+            t = F.softmax(TR[r0:r1] @ TN[n0:n1].T / temp, -1)
+            loss = loss + F.kl_div(F.log_softmax(R[r0:r1] @ N[n0:n1].T / temp, -1), t, reduction="batchmean")
+        return loss / len(spans)
+
+
+def save_atomic(obj, path):
+    """Write to a temporary file, then rename: a shutdown mid-write keeps the old checkpoint."""
+    tmp = Path(str(path) + ".tmp")
+    torch.save(obj, tmp)
+    tmp.replace(path)
 
 
 def to(x, dev):
@@ -134,7 +211,7 @@ def evaluate(model, items, batch=256):
     """Accuracy (a pick is right if it is one of the best answers), nothing-relevant
     precision / recall, accuracy per request class, mean probability of the right answer."""
     model.eval()
-    ok = good = tp = fp = fn = 0
+    ok = good = dirn = tp = fp = fn = 0
     per = collections.defaultdict(lambda: [0, 0])
     p_right = 0.0
     for i in range(0, len(items), batch):
@@ -146,6 +223,7 @@ def evaluate(model, items, batch=256):
             right = bool(t[p] >= t.max() - 1e-6)      # the best answer (or one of equally best)
             ok += right
             good += bool(t[p] > 0)                   # acceptable: not clearly wrong
+            dirn += right_direction(s, p if p < SLOTS else len(s.tools))   # right action and way
             per[s.meta["cls"]][0] += right
             per[s.meta["cls"]][1] += 1
             p_right += float((pr * t).sum())
@@ -154,7 +232,7 @@ def evaluate(model, items, batch=256):
             fp += said_nothing and not is_n
             fn += (not said_nothing) and is_n
     n = len(items)
-    return {"acc": ok / n, "ok": good / n, "p_right": p_right / n,
+    return {"acc": ok / n, "ok": good / n, "dir": dirn / n, "p_right": p_right / n,
             "nothing_precision": tp / max(1, tp + fp), "nothing_recall": tp / max(1, tp + fn),
             "by_class": {k: round(a / b, 3) for k, (a, b) in sorted(per.items())}, "n": n}
 
@@ -194,11 +272,20 @@ def main():
     ap.add_argument("--resume", action="store_true", help="continue from runs/dink/<name>/ckpt.pt")
     ap.add_argument("--gpu-hot", type=int, default=80, help="pause training at this GPU temperature (C)")
     ap.add_argument("--gpu-cool", type=int, default=70, help="...until it is back under this one")
+    ap.add_argument("--anchor", type=float, default=0.0, help="weight of the teacher-corpus distillation loss")
+    ap.add_argument("--match", type=float, default=0.0, help="weight of the request-to-name matching loss")
+    ap.add_argument("--dir-credit", type=float, default=0.0,
+                    help="min share of the best weight for same-action, same-direction options")
+    ap.add_argument("--thin", type=float, default=0.0, help="share of draws with one action's options thinned")
+    ap.add_argument("--loops", type=int, default=1, help="max mixer passes (1 = the plain mixer)")
+    ap.add_argument("--no-inject", action="store_true", help="looped mixer without re-adding its input")
     a = ap.parse_args()
     torch.set_num_threads(a.threads)
     torch.manual_seed(a.seed)
     split = Path(a.split)
     train, val = load(split / "train.jsonl"), load(split / "val.jsonl")
+    if a.dir_credit:
+        train = [credit_direction(s, a.dir_credit) for s in train]
     tests = {p.stem: load(p) for p in sorted(split.glob("test_*.jsonl"))}
     noise = [(A.asr_noise, 1.0), (A.typos, 1.0), (A.fillers, 0.5)]
     nrng = random.Random(123)
@@ -221,7 +308,8 @@ def main():
     if mix:
         have = collections.Counter(source_of(s) for s in train)
         print("mix:", {k: f"{v:.2f} of batches ({have[k]} rows)" for k, v in mix.items()}, flush=True)
-    model = Dink(width=a.width, scenario=a.scenario, raw_magnitude=a.raw_magnitude)
+    model = Dink(width=a.width, scenario=a.scenario, raw_magnitude=a.raw_magnitude, loops=a.loops,
+                 inject=not a.no_inject)
     if a.init == "distilled":
         model.load_distilled(a.ckpt)
     model.to(a.device)
@@ -251,27 +339,39 @@ def main():
         sched.load_state_dict(ck["sched"])
         history, start = ck["history"], ck["step"] + 1
         print(f"resumed at step {start}", flush=True)
+    arng = random.Random(a.seed * 7919 + start)
+    anchor = Anchor(a.ckpt, a.device, arng, match=a.match > 0) if (a.anchor or a.match) else None
+    lrng = random.Random(a.seed * 31 + start)
     loader = iter(torch.utils.data.DataLoader(Batches(train, a.batch, a.seed + start,
                                                                       a.scenario_drop if a.scenario else 0.0,
-                                                                      a.no_state, mix), batch_size=None,
+                                                                      a.no_state, mix, a.thin), batch_size=None,
                                               num_workers=a.workers, pin_memory=a.device != "cpu",
                                               persistent_workers=a.workers > 0))
-    t0 = time.time()
+    t0 = t_last = time.time()
     for step in range(start, a.steps + 1):
         if a.device != "cpu" and step % 25 == 0:
             cool_down(a.gpu_hot, a.gpu_cool)
         model.train()
+        model.loops = lrng.randint(1, a.loops)
         x = to(next(loader), a.device)
         model_logits = model(x)
         logp = F.log_softmax(model_logits, -1)
         loss = -(x["target"] * logp).sum(-1).mean()
         if a.rank_loss:
             loss = loss + a.rank_loss * rank_loss(model_logits, x["target"])
+        if a.anchor:
+            loss = loss + a.anchor * anchor.corpus_loss(model.text)
+        if a.match:
+            loss = loss + a.match * anchor.match_loss(model.text)
         opt.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         opt.step()
         sched.step()
+        model.loops = a.loops
+        if step % 200 == 0:
+            print(f"  step {step}: {200 / (time.time() - t_last):.2f} steps/s", flush=True)
+            t_last = time.time()
         if step in (1, 100) or step % a.eval_every == 0:
             v = evaluate(model, val)
             history.append({"step": step, "loss": loss.item(), "val_acc": v["acc"]})
@@ -279,15 +379,37 @@ def main():
                   f"nothing P/R {v['nothing_precision']:.2f}/{v['nothing_recall']:.2f}  ({time.time() - t0:.0f}s)"
                   + gpu_temp(), flush=True)
         if a.ckpt_every and step % a.ckpt_every == 0:
-            torch.save({"state": model.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
-                        "history": history, "step": step, "args": vars(a)}, out / "ckpt.pt")
-    torch.save({"state": model.state_dict(), "args": vars(a)}, out / "model.pt")
+            save_atomic({"state": model.state_dict(), "opt": opt.state_dict(), "sched": sched.state_dict(),
+                         "history": history, "step": step, "args": vars(a)}, out / "ckpt.pt")
+    save_atomic({"state": model.state_dict(), "args": vars(a)}, out / "model.pt")
+    model.loops = a.loops
     results = {"val": evaluate(model, val)}
     for k, items in tests.items():
         results[k] = evaluate(model, items)
-    print(f"\n{'set':16s} {'best':>6s} {'ok':>6s} {'p(right)':>9s} {'nothing P/R':>12s}")
+    for k in range(1, a.loops):                  # the same weights at fewer passes
+        model.loops = k
+        for t in ("val", "test_areas", "test_worlds", "test_llm", "hard"):
+            items = val if t == "val" else tests.get(t)
+            if items:
+                results[f"{t}@{k}"] = evaluate(model, items)
+    model.loops = a.loops
+    try:                                         # request-to-name matching (dink/teacher/matching.py)
+        from .teacher import matching as M
+        from .teacher.distill import Student
+        meta, _ = M.load()
+        stu = Student(model.text.cpu())
+        for sp in ("areas", "worlds"):
+            acc, n, tub, _ = M.accuracy(stu, [g for g in meta["groups"] if g["split"] == sp])
+            results[f"match_{sp}"] = {"acc": acc, "n": n, "hot_tub": tub}
+        model.text.to(a.device)
+    except FileNotFoundError:
+        pass
+    print(f"\n{'set':16s} {'best':>6s} {'ok':>6s} {'dir':>6s} {'p(right)':>9s} {'nothing P/R':>12s}")
     for k, r in results.items():
-        print(f"{k:16s} {r['acc']:6.3f} {r['ok']:6.3f} {r['p_right']:9.3f} "
+        if k.startswith("match_"):
+            print(f"{k:16s} {r['acc']:6.3f}  (hot tub {r['hot_tub']}/10)")
+            continue
+        print(f"{k:16s} {r['acc']:6.3f} {r['ok']:6.3f} {r['dir']:6.3f} {r['p_right']:9.3f} "
               f"{r['nothing_precision']:6.2f}/{r['nothing_recall']:.2f}")
     (out / "metrics.json").write_text(json.dumps({"args": vars(a), "params": n_params, "history": history,
                                                   "results": results}, indent=2))

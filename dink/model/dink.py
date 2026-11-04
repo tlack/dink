@@ -10,7 +10,7 @@ See docs/architecture.md for the diagram.
   scenario         optional: the gadget's description ("Homebrew fermentation chamber. ..."),
                    encoded once per device by the same T; 2 tokens the mixer can attend to
   mixer            2 pre-norm attention blocks over 8 state + 4 prompt + 8 tool + 1 nothing
-                   (+ 2 scenario tokens when enabled)
+                   (+ 2 scenario tokens when enabled); optionally looped (Loop, below)
   scorer           one logit per tool token and for the nothing token; empty slots masked
 """
 import torch
@@ -41,10 +41,41 @@ def ple_signed(x, edges=REL_EDGES):
     return ((x[..., None] - lo) / width).clamp(0, 1)
 
 
+class Loop(nn.Module):
+    """Runs the mixer up to `max_loops` times with shared weights (arXiv 2610.12582's recipe,
+    scaled down). Pass 1 is the plain mixer, so 1 loop is exactly the unlooped model. Later
+    passes: re-add the mixer's input (if inject), shift and scale by the (pass, budget) pair,
+    run the mixer, and move the state a gated step toward its output:
+        s~ = (1 + lam[i,k]) * (s + e) + mu[i,k]
+        s  = s + sigmoid(W s~ + b) * softplus(gamma) * (mixer(s~) - s)
+    Every new parameter starts at zero (gate step 0.35), and training mixes loop counts, so
+    one set of weights runs at any count from 1 to max_loops."""
+
+    def __init__(self, dim, max_loops, inject=True):
+        super().__init__()
+        self.max_loops, self.inject = max_loops, inject
+        self.cond = nn.Embedding(max_loops * max_loops, 2 * dim)     # (pass i, budget k) -> lam, mu
+        self.gate = nn.Linear(dim, dim)
+        self.gamma = nn.Parameter(torch.zeros(dim))
+        for t in (self.cond.weight, self.gate.weight, self.gate.bias):
+            nn.init.zeros_(t)
+
+    def forward(self, mixer, e, pad, k):
+        s = mixer(e, src_key_padding_mask=pad)
+        for i in range(1, k):
+            lam, mu = self.cond.weight[i * self.max_loops + k - 1].chunk(2)
+            t = (1 + lam) * ((s + e) if self.inject else s) + mu
+            beta = torch.sigmoid(self.gate(t)) * F.softplus(self.gamma)
+            s = s + beta * (mixer(t, src_key_padding_mask=pad) - s)
+        return s
+
+
 class Dink(nn.Module):
     def __init__(self, width=128, dim=64, blocks=2, heads=4, ff=256, dropout=0.1, scenario=False,
-                 raw_magnitude=True):
+                 raw_magnitude=True, loops=1, inject=True):
         super().__init__()
+        self.loop = Loop(dim, loops, inject) if loops > 1 else None
+        self.loops = loops                      # passes used by forward(); training varies it
         self.use_scenario = scenario
         self.raw = raw_magnitude                # False: values enter only as their 0..1 position
         self.text = TextEncoder(width=width, out=dim, queries=PROMPT_TOKENS,
@@ -125,7 +156,12 @@ class Dink(nn.Module):
         if self.use_scenario:                   # 2 tokens after the rest; masked when there is no scenario
             tokens.append(self.text(x["scenario"])[:, :SCENARIO_TOKENS] + self.scenario_role)
             pad.append((~x["scenario_mask"])[:, None].expand(B, SCENARIO_TOKENS))
-        h = self.norm(self.mixer(torch.cat(tokens, 1), src_key_padding_mask=torch.cat(pad, 1)))
+        e, pad = torch.cat(tokens, 1), torch.cat(pad, 1)
+        if self.loop is None or self.loops == 1:
+            h = self.mixer(e, src_key_padding_mask=pad)
+        else:
+            h = self.loop(self.mixer, e, pad, self.loops)
+        h = self.norm(h)
         first = SLOTS + PROMPT_TOKENS
         logits = self.score(h[:, first:first + SLOTS + 1]).squeeze(-1)           # [B, 9]: 8 tools + nothing
         mask = torch.cat([x["tool_mask"], torch.ones(B, 1, dtype=torch.bool, device=prompt.device)], 1)

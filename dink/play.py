@@ -85,7 +85,8 @@ DEFAULT_RUN = "models/dink-v13"     # the released model; training writes runs/d
 def load_model(run, device):
     ck = torch.load(Path(run) / "model.pt", weights_only=True, map_location=device)
     m = Dink(width=ck["args"]["width"], scenario=ck["args"].get("scenario", False),
-             raw_magnitude=ck["args"].get("raw_magnitude", True)).to(device)
+             raw_magnitude=ck["args"].get("raw_magnitude", True),
+             loops=ck["args"].get("loops", 1), inject=not ck["args"].get("no_inject", False)).to(device)
     m.load_state_dict(ck["state"])
     return m.eval()
 
