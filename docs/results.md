@@ -533,3 +533,32 @@ Training options for v15 (`dink/data/direction.py`): `--dir-credit` (right actio
 direction gets at least 0.25 of the best weight, unless the request says a number), `--thin`
 (one action, right or distractor, keeps only some options), and a `dir` score in every
 evaluation (right action and direction).
+
+## 2026-11-04: direction credit + option thinning (v15)
+
+`v15_dir`: v13's recipe + `--dir-credit 0.25 --thin 0.3`. `v15_dir_anchor`: + `--anchor 0.5
+--match 0.5`. "dir" = right action and right direction (`dink/data/direction.py`).
+
+| set (best / dir) | v13 | v15_dir | v15_dir_anchor |
+|---|---|---|---|
+| test_areas | 0.906 / 0.946 | 0.898 / 0.946 | 0.910 / 0.958 |
+| test_worlds | 0.904 / 0.944 | 0.900 / 0.932 | 0.904 / 0.944 |
+| test_words | 0.820 / 0.900 | 0.812 / 0.898 | 0.810 / 0.864 |
+| test_styles | 0.922 / 0.972 | 0.882 / 0.946 | 0.894 / 0.956 |
+| test_llm | 0.862 / 0.924 | 0.856 / 0.902 | 0.862 / 0.914 |
+| test_mixed | 0.878 / 0.916 | 0.882 / 0.920 | 0.844 / 0.878 |
+| test_ha / test_ha_unseen | 0.939 / 0.769 | 0.957 / 0.703 | 0.965 / 0.736 |
+| hard cases (38) | 37 | 30 | 28 |
+| example gadgets, action = LLM label (288, harness fixed) | 175 | **188** | 181 |
+| hot tub jets requests (5) | 2 | **5** | 2 |
+
+Readings:
+- `v15_dir` fixes the jets end to end ("more", "less", "max", "crank", "faster jets") and
+  gains 13 of 288 on the example gadgets. Held-out sets are flat on both scores (within noise).
+- The cost is precision at the extremes. Hard-case misses: "super bright" -> 0.6 (1 wanted),
+  "a little warmer" -> 73 (71), "warmer please" -> 76 (73), and two that leave the right
+  direction: "make it really dark in here" with short names (bed_lite) -> 1, and "is it
+  dark outside yet" -> goodnight. A 0.25 floor tells the model an off-size move is a quarter
+  right, and "super"/"really" lose their pull toward the range end.
+- The anchor on top doesn't help end to end (jets 2/5, hard 28/38).
+- The hard cases have no meta["needed"], so their dir score equals best; worth adding.
