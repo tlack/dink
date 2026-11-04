@@ -562,3 +562,37 @@ Readings:
   right, and "super"/"really" lose their pull toward the range end.
 - The anchor on top doesn't help end to end (jets 2/5, hard 28/38).
 - The hard cases have no meta["needed"], so their dir score equals best; worth adding.
+
+## 2026-11-04: softer credit vs thinning alone (v16)
+
+`v16_dir`: `--dir-credit 0.1` (now skipped for requests that name a size: classes ending
+_small/_big/_max) + `--thin 0.3`. `v16_thin`: `--thin 0.3` only. Hard cases now carry
+meta["needed"], so their dir score means something (v13: best 37/38, dir 38/38).
+
+| set (best / dir) | v13 | v15_dir | v16_dir | v16_thin |
+|---|---|---|---|---|
+| test_areas | 0.906 / 0.946 | 0.898 / 0.946 | 0.868 / 0.920 | 0.878 / 0.920 |
+| test_worlds | 0.904 / 0.944 | 0.900 / 0.932 | 0.900 / 0.934 | 0.900 / 0.930 |
+| test_words | 0.820 / 0.900 | 0.812 / 0.898 | 0.834 / 0.914 | 0.848 / 0.910 |
+| test_styles | 0.922 / 0.972 | 0.882 / 0.946 | 0.924 / 0.970 | 0.902 / 0.956 |
+| test_llm | 0.862 / 0.924 | 0.856 / 0.902 | 0.844 / 0.918 | 0.824 / 0.888 |
+| test_ha / test_ha_unseen | 0.939 / 0.769 | 0.957 / 0.703 | 0.960 / 0.747 | 0.959 / 0.846 |
+| hard cases (38), best / dir | 37 / 38 | 30 / 30* | 30 / 35 | 31 / 34 |
+| example gadgets (288) | 175 | **188** | 176 | 180 |
+| hot tub jets (5) | 2 | 5 | 5 | 4 |
+
+\* v15 was scored before the hard cases had meta["needed"].
+
+Readings:
+- **Thinning is what fixes the jets** (alone: 4/5; it misses "max jets"). The credit adds
+  "max jets" and nothing measurable elsewhere.
+- **The hard-case losses come with thinning, not credit**: the same misses in every
+  thinning run. Most are amounts read by size rather than rank: "a little warmer" (70 on
+  60..85, offered 71/73/76) -> 73, "warmer please" -> 76. By IDEAL fractions (small 0.15,
+  plain 0.35 of the room) 73 and 76 are the closer sizes; the hard cases expect rank (the
+  smallest / middle option). Thinning breaks rank as a cue, so the model reads size.
+- The wrong-direction misses are "make it really dark in here" -> light 1 (both name
+  styles; light at 0.3, offered 0 / 0.6 / 1) and "is it dark outside yet" -> goodnight.
+- Held-out sets move within ±0.03 both ways (test_areas down, words and HA up): single
+  seeds can't separate these runs. Decisions here rest on 19 hand-written prompts and 5
+  jets requests.

@@ -53,7 +53,8 @@ def gate_cases():
     for prompt, values, right in GATE:
         tools = [Field("set_entrance_gate_position", v, 0, 1) for v in values] + [Field("sound_alarm", 0, 0, 0, arg=False)]
         target = [1.0 if t.arg and t.value == right else 0.0 for t in tools] + [0.0]
-        out.append(Scenario(GATE_STATE, prompt, tools, target, {"cls": "hard_ends"}).check())
+        out.append(Scenario(GATE_STATE, prompt, tools, target,
+                            {"cls": "hard_ends", "needed": ["entrance_gate_position"]}).check())
     return out
 
 
@@ -69,7 +70,7 @@ def count_cases():
         tools = [Field("set_bedroom_thermostat", v, 60, 85) for v in values] + [Field("goodnight", 0, 0, 0, arg=False)]
         target = [1.0 / len(right) if t.arg and t.value in right else 0.0 for t in tools] + [0.0]
         out.append(Scenario([Field("bedroom_thermostat", 70, 60, 85)], prompt, tools, target,
-                            {"cls": "hard_counts"}).check())
+                            {"cls": "hard_counts", "needed": ["bedroom_thermostat"]}).check())
     return out
 
 
@@ -84,7 +85,8 @@ def cases():
             target = [0.0] * (len(tools) + 1)
             for r in right:
                 target[len(tools) if r == "none" else keys.index(r)] = 1.0 / len(right)
-            out.append(Scenario(state, prompt, tools, target, {"cls": f"hard_{style}"}).check())
+            sets = {"t": [state[0].name], "l": [state[1].name]}.get(right[0][0], [])  # the field it sets
+            out.append(Scenario(state, prompt, tools, target, {"cls": f"hard_{style}", "needed": sets}).check())
     return out
 
 

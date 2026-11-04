@@ -8,11 +8,14 @@ one. Here:
   same_direction(s)      the options on the answer's action that move the same way from its
                          current value (meta["needed"] names the state field it sets)
   credit_direction(s)    training targets: those options get at least `floor` of the best
-                         option's weight (requests that say a number are left alone)
+                         option's weight. Left alone: requests that say a number, and
+                         requests that name a size ("a little", "a lot", "all the way":
+                         classes ending in _small, _big, _max), where the amount is the point
   thin_options(s, rng)   augmentation: one action (right or distractor) keeps only some of
                          its options, so "offered once" or "lopsided" is no tell
 """
 import copy
+import re
 
 from .numbers import extract
 
@@ -49,9 +52,12 @@ def same_direction(s):
     return [i for i, t in enumerate(s.tools) if t.name == best.name and t.arg and _sign(t.value - cur) == d]
 
 
-def credit_direction(s, floor=0.25):
+SIZED = re.compile(r"_(small|big|max)$")
+
+
+def credit_direction(s, floor=0.1):
     """Same-direction options get at least floor x the best weight; renormalized."""
-    if floor <= 0 or extract(s.prompt):
+    if floor <= 0 or extract(s.prompt) or SIZED.search(s.meta.get("cls") or ""):
         return s
     idx = same_direction(s)
     top = max(s.target)

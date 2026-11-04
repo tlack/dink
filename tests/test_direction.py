@@ -19,6 +19,9 @@ def test_credit_direction():
     t = credit_direction(scen(), 0.25).target
     assert t[0] > t[1] > 0 and t[2] == t[3] == t[4] == 0 and abs(sum(t) - 1) < 1e-9
     assert credit_direction(scen("set it to 74"), 0.25).target == scen().target   # a number said: exact
+    sized = scen("a little warmer")
+    sized.meta["cls"] = "relative_small"
+    assert credit_direction(sized, 0.25).target == sized.target                   # a size named: exact
 
 
 def test_right_direction():
