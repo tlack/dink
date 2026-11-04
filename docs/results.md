@@ -596,3 +596,47 @@ Readings:
 - Held-out sets move within ±0.03 both ways (test_areas down, words and HA up): single
   seeds can't separate these runs. Decisions here rest on 19 hand-written prompts and 5
   jets requests.
+
+## 2026-11-04: direction probes (264 made-up gadgets, run through the harness)
+
+The hard cases are 19 prompts on one bedroom. `dink/evals/direction.py` scores 264 cases,
+each with its own small gadget (`dink/evals/direction_cases.jsonl`): 243 written by the LLM
+(`dink/llm/probes.py`, 12 themes, ~70 kinds of device, reviewed by hand: 33 of 276 dropped
+as wrong or ambiguous, 6 fixed) plus 21 by hand (the 1..3 fan, the hot tub, the bedroom).
+Each runs through the two-pass harness, as on a device. Scoring follows "most correct in
+the right direction":
+
+- **dir**: the right action (or any action setting the same field), moved the right way;
+  nothing for questions, and nothing is fine when the value is already at the end asked for.
+- **full**: dir, and the amount fits by *rank* among the options offered that way: "a
+  little" is not the farthest option (on 1..3 at 3, "a little lower" is 2, not 1; at 1,
+  nothing is fine), "a lot" is not the nearest, "all the way" is the end, a number said is
+  that number.
+- **lone**: the raw model on pass-1 options with the right action offered once (its
+  other-way option dropped), 218 cases.
+
+| (264 cases) | v13 | v14_anchor | v15_dir | v16_dir | v16_thin |
+|---|---|---|---|---|---|
+| dir | 0.81 | 0.80 | 0.84 | 0.83 | 0.84 |
+| full | 0.80 | 0.78 | 0.82 | 0.81 | 0.81 |
+| lone | **0.46** | 0.48 | 0.76 | 0.74 | **0.77** |
+| misses: wrong device | 34 | 33 | 23 | 31 | 27 |
+| misses: right device, wrong way | 7 | 9 | 11 | 4 | 4 |
+| misses: did nothing / acted on a question | 7 / 2 | 7 / 3 | 5 / 4 | 6 / 4 | 9 / 3 |
+| misses: amount | 4 | 5 | 4 | 4 | 6 |
+
+Paired against v13 on the same cases: dir +24 / -17 for v16_thin (not significant), lone
++75 / -9 (clearly real; v15_dir +74 / -9, v16_dir +69 / -8).
+
+Readings:
+- **Direction is mostly fine; the device is the problem.** Wrong device is 60-70% of the
+  misses in every run, and the harness offered the right action every time (trimming to 8
+  options never dropped it). Examples: "this pace is a bit much" -> incline, "this water is
+  lukewarm" -> water level, "the reds are too cold" -> the white-wine zone, "the top rack
+  is drowning" -> lower rinse, "it's blazing in there" -> ignite.
+- **Thinning fixes a real shortcut**: v13 picks an action offered once only 46% of the time.
+  That shortcut is what "more jets" hit; it's general, not about jets.
+- The hard-case regressions from thinning (amounts read by size) don't show here: scored by
+  rank, amounts are 4-6 misses in every run.
+- Right-way misses left on the right device are few and scattered: "less smoke" -> up,
+  "the glasses come out soaking wet" -> dry time 0, "make it really dark in here" -> 1.
