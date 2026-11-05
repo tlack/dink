@@ -3,7 +3,7 @@ number extraction against dink.data.numbers, dink_score against the NumPy refere
 the int8 trunk, and dink_decide against dink.harness with the PyTorch model.
 
   esp32/host/build.sh
-  uv run python -m dink.device.check_c esp32/host/libdink.so models/dink-v13
+  uv run python -m dink.device.check_c esp32/host/libdink.so models/dink-v16
 """
 import argparse
 import ctypes as C

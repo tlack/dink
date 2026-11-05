@@ -20,7 +20,7 @@ Scored for "most correct in the right direction":
 Misses by kind: action (wrong device), way (right device, wrong way), idle (did nothing),
 acted (acted on a question), amount (right way, amount off).
 
-  uv run python -m dink.evals.direction --run models/dink-v13 runs/dink/v16_thin [--misses]
+  uv run python -m dink.evals.direction --run models/dink-v16 runs/dink/<name> [--misses]
 """
 import argparse
 import json
@@ -156,7 +156,7 @@ def summary(rows):
 def main():
     from ..play import load_model
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--run", nargs="+", default=["models/dink-v13"])
+    ap.add_argument("--run", nargs="+", default=["models/dink-v16"])
     ap.add_argument("--cases", default=str(CASES))
     ap.add_argument("--misses", action="store_true", help="list every miss")
     ap.add_argument("--save", help="write per-case results (JSON) here")

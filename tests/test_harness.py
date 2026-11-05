@@ -6,7 +6,7 @@ from dink.gen.ordinal import nice
 from dink.harness import decide, ladder
 from dink.play import load_model
 
-MODEL = Path(__file__).resolve().parents[1] / "models" / "dink-v13"
+MODEL = Path(__file__).resolve().parents[1] / "models" / "dink-v16"
 
 TUB = {
     "state": [{"name": "water_temperature", "value": 102, "lo": 80, "hi": 104},

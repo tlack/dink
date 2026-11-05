@@ -2,7 +2,7 @@
 each request's LLM label and the PyTorch harness's answer, so the board's answers can be
 compared on the spot.
 
-  uv run python -m dink.device.c_gadgets models/dink-v13 --out esp32/firmware/main/gadgets.h
+  uv run python -m dink.device.c_gadgets models/dink-v16 --out esp32/firmware/main/gadgets.h
 """
 import argparse
 import json

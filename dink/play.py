@@ -79,7 +79,7 @@ def fmt(f):
     return f"{f.name}()" if not f.arg else f"{f.name}={f.value:g} [{f.lo:g}..{f.hi:g}]"
 
 
-DEFAULT_RUN = "models/dink-v13"     # the released model; training writes runs/dink/<name>
+DEFAULT_RUN = "models/dink-v16"     # the released model; training writes runs/dink/<name>
 
 
 def load_model(run, device):

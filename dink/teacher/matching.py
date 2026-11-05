@@ -12,7 +12,7 @@ Held out exactly as Dink's split (configs/home_split_v4.json): the 5 test_areas 
 the test_worlds worlds are evaluation only, so Dink's test sets stay clean.
 
   uv run python -m dink.teacher.matching --embed        # data/teacher/match.json + match_teacher.npy
-  uv run python -m dink.teacher.matching --eval runs/text/tv128/model.pt models/dink-v13/model.pt
+  uv run python -m dink.teacher.matching --eval runs/text/tv128/model.pt models/dink-v16/model.pt
 """
 import argparse
 import json

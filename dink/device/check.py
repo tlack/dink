@@ -1,6 +1,6 @@
 """Accuracy of the device arithmetic (float NumPy reference, int8 trunk) on held-out sets.
 
-  uv run python -m dink.device.check models/dink-v13 --n 200
+  uv run python -m dink.device.check models/dink-v16 --n 200
 """
 import argparse
 import json

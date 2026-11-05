@@ -1,7 +1,7 @@
 """Export a trained Dink for the ESP32: one file the C engine (esp32/components/dink) maps
 in place.
 
-  uv run python -m dink.device.export models/dink-v13 --out models/dink-v13/dink.dnk
+  uv run python -m dink.device.export models/dink-v16 --out models/dink-v16/dink.dnk
 
 Layout (little endian, every section 16-byte aligned):
   header      "DNK1", version, n_tensors, mmrt_off, mmrt_size, then config words

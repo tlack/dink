@@ -14,7 +14,7 @@ Named after Peter Dinklage: small, and punches far above its size. Companion to
 [BabyTalk](https://github.com/tlack/babytalk), on-device speech to text for the ESP32-S3,
 which can supply the spoken requests.
 
-**Status:** research release. The trained model (`models/dink-v13`) runs in PyTorch, and on
+**Status:** research release. The trained model (`models/dink-v16`) runs in PyTorch, and on
 an ESP32-S3 through [BabyTalk](https://github.com/tlack/babytalk)'s MMRT runtime (see
 [On the ESP32-S3](#on-the-esp32-s3)).
 
@@ -34,13 +34,13 @@ actions: set_temperature(80..104)  set_ph(6.8..8.2)  increase_sanitizer(0..10)
 $ uv run python examples/quickstart.py
 'turn on the ozone'              -> turn_on_ozone()          100%
 'set jet speed to 2'             -> set_jet_speed(2)         100%
-'bump the sanitizer up a bit'    -> increase_sanitizer(4)    100%
+'bump the sanitizer up a bit'    -> increase_sanitizer(4)     99%
 'the water is way too hot'       -> set_temperature(80)      100%
-'i want it hotter'               -> set_temperature(104)      93%
+'i want it hotter'               -> set_temperature(104)      65%
 "what's the ph right now?"       -> (nothing relevant)       100%
-'turn on the underwater light'   -> (nothing relevant)       100%
+'turn on the underwater light'   -> (nothing relevant)        88%
 'play some jazz'                 -> (nothing relevant)       100%
-'more jets'                      -> increase_sanitizer(7)     98%   <- wrong: a known miss
+'more jets'                      -> set_jet_speed(2)          81%
 ```
 
 Dink only ranks the options it is given, so a gadget can have more actions and values than 8
@@ -76,6 +76,7 @@ uv run python -m dink.play \
 uv run python -m dink.play -i                              # interactive (:help)
 
 uv run python -m dink.evals.hard                           # 38 hand-written hard cases
+uv run python -m dink.evals.direction --misses             # 264 direction probes, each its own gadget
 uv run pytest
 ```
 
@@ -85,7 +86,7 @@ From Python:
 from dink.play import load_model
 from dink.harness import decide
 
-model = load_model("models/dink-v13", "cpu")
+model = load_model("models/dink-v16", "cpu")
 gadget = {
     "state":   [{"name": "fan_speed", "value": 1, "lo": 0, "hi": 3}],
     "actions": [{"name": "set_fan_speed", "lo": 0, "hi": 3, "sets": "fan_speed"},
@@ -111,10 +112,10 @@ tub's area (saunas and hot tubs) was held out entirely.
 
 | gadget | right | close | wrong |
 |---|---|---|---|
-| hot tub jets and sanitizer | 9 | 2 | 1 |
+| hot tub jets and sanitizer | 9 | 1 | 2 |
 | refinery crude charge heater | 8 | 2 | 2 |
 | distillation column reflux | 8 | 2 | 2 |
-| Mars habitat water reclamation | 7 | 3 | 2 |
+| Mars habitat water reclamation | 8 | 3 | 1 |
 
 "Close" means the right action and direction with an amount one strength step off. Replay
 any gadget with `dink.play_new --load` (add `--all` to also score the rewordings and
@@ -123,7 +124,7 @@ flips). Lines from the refinery:
 ```
 complaint  the crude outlet is too hot               LLM: set_crude_outlet_temp=327   Dink: set_crude_outlet_temp=230  CLOSE
 slang      crank the gas juice up a bit              LLM: set_fuel_gas_flow=48        Dink: set_fuel_gas_flow=50       RIGHT
-missing    set the feed rate to 100 barrels per hour LLM: (nothing)                   Dink: set_fuel_gas_flow=100      WRONG
+missing    set the feed rate to 100 barrels per hour LLM: (nothing)                   Dink: set_air_damper_position=100 WRONG
 limit      make the outlet even hotter               LLM: (nothing)                   Dink: (nothing)                  RIGHT
 ```
 
@@ -136,7 +137,7 @@ Dink runs on an ESP32-S3 (240 MHz, no PSRAM needed). The C engine and a test fir
 [esp32/](esp32/README.md). They build on MMRT, the inference runtime from
 [BabyTalk](https://github.com/tlack/babytalk) (a git submodule): the text encoder's
 convolutions run on MMRT's int8 vector kernels, and the float32 layers use its `mmrt_f32` ops.
-Measured on the board:
+Measured on the board (with dink-v13; v16 is the same network, so the same cost):
 
 | | |
 |---|---|
@@ -156,8 +157,8 @@ dink> what's the weather
   -> (nothing)  100%  (69 ms, 1 pass)
 ```
 
-The device file is `models/dink-v13/dink.dnk`, made by `uv run python -m dink.device.export
-models/dink-v13`. [dink/device/reference.py](dink/device/reference.py) is the C engine's spec
+The device file is `models/dink-v16/dink.dnk`, made by `uv run python -m dink.device.export
+models/dink-v16`. [dink/device/reference.py](dink/device/reference.py) is the C engine's spec
 in NumPy and matches PyTorch to 1e-5. `dink.device.check_c` compares the C engine, built for
 the PC, with the Python on every step:
 
@@ -165,36 +166,40 @@ the PC, with the Python on every step:
 |---|---|
 | number extraction ("seventy two", "50 percent", "half") | 4,899 / 4,899 prompts agree |
 | the network, against the same int8 arithmetic in NumPy | 341 / 341 picks, probabilities within 1e-5 |
-| the two-pass harness, against PyTorch | 281 / 288 requests |
-| int8 vs float on held-out test sets | accuracy within one point (`dink.device.check`) |
+| the two-pass harness, against PyTorch | 259 / 288 requests (most of the rest: jets vs sanitizer on the hot tub, or the amount rounded differently) |
+| int8 vs float on held-out test sets | accuracy within 1.5 points (`dink.device.check`) |
 
-## Results (dink-v13)
+## Results
 
-Accuracy on held-out data (the best answer; "ok" scores in [models/dink-v13](models/dink-v13/README.md)):
+Accuracy of `dink-v16` on held-out data (the best answer; more scores in [models/dink-v16](models/dink-v16/README.md)):
 
 | test | accuracy |
 |---|---|
-| LLM gadgets in 5 areas never seen in training (beekeeping, saunas, drones, clinics, studios) | 0.91 |
+| LLM gadgets in 5 areas never seen in training (beekeeping, saunas, drones, clinics, studios) | 0.88 |
 | LLM gadgets, unseen gadgets in known areas | 0.90 |
-| Home Assistant's own hand-written test sentences (809) | 0.94 |
-| Home Assistant intents never trained on (91) | 0.77 |
-| smart home: held-out words / templates / naming styles | 0.82 / 0.90 / 0.92 |
+| Home Assistant's own hand-written test sentences (809) | 0.96 |
+| Home Assistant intents never trained on (91) | 0.85 |
+| smart home: held-out words / templates / naming styles | 0.85 / 0.90 / 0.90 |
 | prompt-only, no state at all | 0.97 |
-| hand-written hard cases | 37 / 38 |
+| direction probes: 264 made-up gadgets, right action and direction | 0.84 |
+| hand-written hard cases | 31 / 38 |
 
-Every experiment that led here, with its numbers and what we learned: [docs/results.md](docs/results.md).
+How the model got here, version by version: [docs/history.md](docs/history.md). Every
+experiment, with its numbers and what we learned: [docs/results.md](docs/results.md).
 
 ## Limitations
 
-- **The device runs int8 for part of the network.** On the board, 42 of 44 example requests
-  give exactly PyTorch's answer; the other two differ by int8 rounding in the text encoder.
+- **The device runs int8 for part of the network.** The C engine gives PyTorch's answer on
+  259 of 288 example requests. Where they differ it's int8 rounding in the text encoder,
+  which tips near-ties (jets vs sanitizer on the hot tub) or the amount.
 - **English only.** Requests are at most 64 bytes and names at most 40. Longer text is cut
   from the front, without a warning.
 - **One action per request.** "Lights off and lock the door" is out of scope.
-- **Words it never learned.** On the hot tub, "more jets" goes to the sanitizer. Saying the
-  number ("jet speed to 2") works.
+- **Picking the right device** is most of what it gets wrong. On the direction probes, 27 of
+  44 misses pick another action ("this pace is a bit much" -> incline), and only 4 move the
+  right one the wrong way. Everyday words that aren't in the action's name are the hard part.
 - **Complaints and desires** ("the pressure is creeping too high") are its weakest phrasings:
-  0.72 and 0.80 on unseen areas.
+  0.67 and 0.72 on unseen areas.
 - **A number for a missing device** can land on a device that is present (the refinery line above).
 - **Calibration has not been measured.** Treat "100%" as confident, not certain.
 
@@ -204,7 +209,7 @@ Every experiment that led here, with its numbers and what we learned: [docs/resu
   turbo). Today values must be numbers in a range, and categories have no order, so mapping
   them to 1 / 2 / 3 would teach Dink a ranking that isn't there. The workaround is one
   no-value action per choice (`play_country`, `mode_eco`), which uses up slots and only
-  partly works: v13 picks `mode_eco` and `mode_turbo` correctly, but sends "play some
+  partly works: tested on v13, it picks `mode_eco` and `mode_turbo` correctly, but sends "play some
   country music" and "put on jazz" to `play_rock`. Not settled yet. Candidates (details in [PLAN.md](PLAN.md), "Later ideas"): a text-valued argument
   encoded by the text encoder and fused like a number, or two passes (pick `play_music`,
   then run Dink again with the genres as its options, 8 per page).
@@ -229,7 +234,7 @@ sources below, and the LLM-generated files in `data/llm/`. Those LLM files are n
 repository. Running the jobs in `dink/llm/` again needs an OpenRouter key, and gives
 different data. Training uses a GPU (about 100 minutes for 40k steps on a laptop GPU).
 
-The recipe for `dink-v13`:
+The recipe for `dink-v16`:
 
 ```sh
 # 1. text encoder: distill the teacher (corpus, value descriptions, then distillation)
@@ -253,7 +258,7 @@ uv run python -m dink.data.split data/worlds/pool.jsonl --config configs/home_sp
 
 # 3. train (writes runs/dink/mine/model.pt)
 uv run python -u -m dink.train --split data/home/split --batch 512 --steps 40000 --eval-every 4000 \
-    --no-state 0.3 --mix "home=0.4,world=0.45,ha=0.15" --rank-loss 0.5 \
+    --no-state 0.3 --mix "home=0.4,world=0.45,ha=0.15" --rank-loss 0.5 --thin 0.3 \
     --extra-test data/ha/test_ha.jsonl data/ha/test_ha_unseen.jsonl --name mine
 ```
 
@@ -261,7 +266,7 @@ uv run python -u -m dink.train --split data/home/split --batch 512 --steps 40000
 
 | path | what |
 |---|---|
-| `models/dink-v13/` | the released weights, the ESP32 file (`dink.dnk`), training args and test scores |
+| `models/dink-v16/` | the released weights, the ESP32 file (`dink.dnk`), training args and test scores |
 | `examples/` | `quickstart.py` and four LLM-invented gadgets with labeled requests |
 | `dink/model/` | the network: byte text encoder, value fuse, relation step, mixer, scorer |
 | `dink/harness.py` | turns a gadget and a request into options, two passes |

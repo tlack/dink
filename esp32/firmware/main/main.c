@@ -2,7 +2,7 @@
 // LLM's label and the PyTorch harness's answer, with timings; then takes typed requests.
 //
 //   ./idf.sh build
-//   ./flash.sh                    # app + the model partition (models/dink-v13/dink.dnk)
+//   ./flash.sh                    # app + the model partition (models/dink-v16/dink.dnk)
 //   ./idf.sh -p /dev/ttyACM0 monitor
 #include <stdio.h>
 #include <stdlib.h>
@@ -175,7 +175,7 @@ void app_main(void)
     const void *img = NULL;
     esp_partition_mmap_handle_t mh;
     if (!part || esp_partition_mmap(part, 0, part->size, ESP_PARTITION_MMAP_DATA, &img, &mh) != ESP_OK) {
-        printf("no model partition: flash models/dink-v13/dink.dnk at 0x210000\n");
+        printf("no model partition: flash models/dink-v16/dink.dnk at 0x210000\n");
         return;
     }
     const uint32_t *h = (const uint32_t *)img;

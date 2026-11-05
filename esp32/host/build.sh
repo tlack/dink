@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build Dink's engine and MMRT's portable kernels as a PC shared library, for the parity check:
-#   esp32/host/build.sh && uv run python -m dink.device.check_c esp32/host/libdink.so models/dink-v13
+#   esp32/host/build.sh && uv run python -m dink.device.check_c esp32/host/libdink.so models/dink-v16
 set -e
 H="$(cd "$(dirname "$0")" && pwd)"
 M="$H/../babytalk/mmrt"

@@ -1,6 +1,6 @@
 """Score a trained Dink checkpoint on a split's test sets.
 
-  uv run python -m dink.evaluate models/dink-v13 --split data/home/split_v13
+  uv run python -m dink.evaluate models/dink-v16 --split data/home/split_v13
 """
 import argparse
 from pathlib import Path

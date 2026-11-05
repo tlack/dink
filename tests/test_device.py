@@ -13,7 +13,7 @@ from dink.harness import fields, pass1_tools, score
 from dink.play import load_model
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN = ROOT / "models" / "dink-v13"
+RUN = ROOT / "models" / "dink-v16"
 
 
 @pytest.fixture(scope="module")

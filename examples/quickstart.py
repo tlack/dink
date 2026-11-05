@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from dink.harness import decide
 from dink.play import load_model
 
-MODEL = Path(__file__).resolve().parents[1] / "models" / "dink-v13"
+MODEL = Path(__file__).resolve().parents[1] / "models" / "dink-v16"
 
 gadget = {
     "state": [
@@ -43,7 +43,7 @@ requests = sys.argv[1:] or [
     "what's the ph right now?",             # a question, not a command
     "turn on the underwater light",         # a device this gadget doesn't have
     "play some jazz",                       # unrelated
-    "more jets",                            # a known miss: v13 never learned "jets"
+    "more jets",                            # an everyday word: the action is set_jet_speed
 ]
 
 model = load_model(MODEL, "cpu")

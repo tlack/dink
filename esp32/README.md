@@ -14,7 +14,9 @@ Dink's C engine and a test firmware. Dink builds on **MMRT**, the int8 inference
 ## Measured on an ESP32-S3
 
 ESP32-S3 at 240 MHz, 16 MB flash, no PSRAM. The model file (623 KB) is read in place from
-flash.
+flash. Measured with dink-v13; dink-v16 is the same network, so timing and memory are the
+same, but its answers on the board haven't been re-checked yet (the PC build of the same C
+engine has, below).
 
 | | |
 |---|---|
@@ -25,8 +27,8 @@ flash.
 | working memory | 59 KB of internal RAM, plus MMRT's 72 KB staging buffers |
 | app size | 250 KB |
 
-Answers match the PC: on 44 requests to the four example gadgets (`examples/gadgets/`), the
-board gives the same action and value as the PyTorch harness on 42. The two differences come
+Answers matched the PC (dink-v13): on 44 requests to the four example gadgets (`examples/gadgets/`), the
+board gave the same action and value as the PyTorch harness on 42. The two differences come
 from the int8 text encoder (one of them lands on the LLM's labeled answer where PyTorch
 didn't) and from float rounding (3.82 vs 3.83). MMRT's S3 kernels give bit-identical results
 to its portable reference on Dink's layers.
@@ -51,7 +53,7 @@ git submodule update --init esp32/babytalk
 export IDF_PATH=~/esp/esp-idf                         # your ESP-IDF v5.5
 cd esp32/firmware
 ./idf.sh build
-BOARD_MAC=aa:bb:cc:dd:ee:ff ./flash.sh                # app + models/dink-v13/dink.dnk at 0x210000
+BOARD_MAC=aa:bb:cc:dd:ee:ff ./flash.sh                # app + models/dink-v16/dink.dnk at 0x210000
 ./idf.sh -p /dev/ttyACM0 monitor
 ```
 
@@ -61,7 +63,7 @@ refuses to write to any other board (`esptool.py --port /dev/ttyACM0 read_mac` s
 The firmware runs every example request, printing each answer next to the LLM's label and
 PyTorch's answer, then reads requests from the USB console (`:g N` switches gadget). The
 example gadgets are compiled in from `firmware/main/gadgets.h`, made by
-`uv run python -m dink.device.c_gadgets models/dink-v13 --out esp32/firmware/main/gadgets.h`.
+`uv run python -m dink.device.c_gadgets models/dink-v16 --out esp32/firmware/main/gadgets.h`.
 
 ## Using it in your app
 
@@ -95,14 +97,14 @@ yourself, if you'd rather not use the two-pass harness.
 
 ```bash
 esp32/host/build.sh                                       # the engine + MMRT, for the PC
-uv run python -m dink.device.check_c esp32/host/libdink.so models/dink-v13
+uv run python -m dink.device.check_c esp32/host/libdink.so models/dink-v16
 ```
 
 | check | result |
 |---|---|
 | number extraction, every test prompt | 4,899 / 4,899 agree |
 | the network, against `dink/device/reference.py` with the same int8 arithmetic | 341 / 341 picks, probabilities within 1e-5 |
-| the two-pass harness, against PyTorch | 281 / 288 requests |
+| the two-pass harness, against PyTorch | 259 / 288 requests (dink-v16; v13: 281). Most differences are jets vs sanitizer on the hot tub, a near-tie that int8 rounding tips, or the amount rounded differently |
 
 ## Next
 
